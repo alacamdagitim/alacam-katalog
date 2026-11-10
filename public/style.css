@@ -1037,11 +1037,23 @@ kbd {
 }
 .floating-contact svg { width: 50%; height: 50%; fill: currentColor; }
 :is(.category-menu, .card-scroll, .table-scroll) { padding-block-end: var(--contact-clearance); }
-@media (max-width: 749px) {
-  :root { --contact-size: 52px; --contact-inset: 12px; }
-}
-@media (orientation: landscape) and (max-height: 500px) {
-  :root { --contact-size: 44px; --contact-gap: 8px; --contact-inset: 10px; }
+@media (max-width: 749px), (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --contact-size: 44px;
+    --contact-gap: 8px;
+    --contact-inset: 8px;
+    --contact-clearance: 0px;
+  }
+  .catalog-main {
+    min-height: 0;
+    margin-inline-end: calc(var(--safe-right) + var(--contact-size) + 2 * var(--contact-inset));
+  }
+  .catalog-main .shell {
+    width: auto;
+    margin-inline: max(12px, calc(var(--safe-left) + 6px)) 12px;
+  }
+  .catalog-main :is(.card-scroll, .table-scroll) { margin-inline-end: 0; }
+  .floating-contact { bottom: calc(var(--safe-bottom) + var(--contact-inset)); }
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .floating-contact a { transition: transform .15s ease; }

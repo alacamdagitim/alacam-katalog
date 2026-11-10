@@ -8,11 +8,11 @@ Sepet müşterinin tarayıcısında saklanır. **WhatsApp’ta aç** düğmesi �
 
 ## Yerel önizleme
 
-Node.js 20 veya üzeriyle proje klasöründe `npm run dev` çalıştırın ve [127.0.0.1:4173](http://127.0.0.1:4173/) adresini açın.
+Node.js 22 ile proje klasöründe `npm run dev` çalıştırın ve [127.0.0.1:4173](http://127.0.0.1:4173/) adresini açın.
 
 ## Vercel
 
-Git deposunu Vercel’e yeni proje olarak içe aktarın ve proje klasörünü kök dizin olarak seçin. `vercel.json`, `public` klasöründeki statik arayüzü, ürün verisi için `/api/catalog` ve taksit seçenekleri için `/api/installments` fonksiyonlarını yapılandırır. Ortam değişkeni veya paket kurulumu gerekmez.
+Git deposunu Vercel’e yeni proje olarak içe aktarın. **Root Directory** olarak deponun kökünü seçin. `vercel.json`, `public` klasöründeki statik arayüzü ve `/api/catalog` ile `/api/installments` fonksiyonlarını yapılandırır. Proje Node.js 22 kullanır. Varsayılan dağıtım için ortam değişkeni, paket kurulumu veya derleme komutu gerekmez.
 
 Katalog sayfası arama motorları için `noindex` olarak işaretlenir. Yayın bağlantısına sahip kişiler kataloğu açabilir.
 

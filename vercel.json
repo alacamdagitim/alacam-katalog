@@ -1,12 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
+  "installCommand": "npm ci",
   "buildCommand": "",
   "outputDirectory": "public",
   "functions": {
     "api/catalog.js": { "maxDuration": 30 },
-    "api/installments.js": { "maxDuration": 20 }
+    "api/installments.js": { "maxDuration": 20 },
+    "api/wholesale.js": { "maxDuration": 30 }
   },
   "headers": [
     { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }

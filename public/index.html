@@ -9,7 +9,9 @@
   <title>Ürün Kataloğu | Alaçam Dağıtım</title>
   <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/wholesale-admin.css">
   <script type="module" src="/catalog.js"></script>
+  <script type="module" src="/wholesale-admin.js"></script>
 </head>
 <body>
   <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -20,6 +22,7 @@
     <symbol id="i-columns" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 5v14m5-14v14"/></symbol>
     <symbol id="i-view-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.5M4 12h.5M4 18h.5"/></symbol>
     <symbol id="i-view-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.2"/><rect x="14" y="4" width="6" height="6" rx="1.2"/><rect x="4" y="14" width="6" height="6" rx="1.2"/><rect x="14" y="14" width="6" height="6" rx="1.2"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m-4 4 4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
     <symbol id="i-grip" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v2"/></symbol>
     <symbol id="i-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
@@ -67,6 +70,10 @@
           <svg class="icon view-grid-icon" aria-hidden="true"><use href="#i-view-grid"/></svg>
           <svg class="icon view-caret" aria-hidden="true"><use href="#i-down"/></svg>
         </label>
+        <button class="button glass-surface wholesale-admin-open" id="wholesale-admin-open" type="button"
+          aria-label="Katalog yükle" aria-haspopup="dialog" aria-controls="wholesale-admin-dialog">
+          <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span>Katalog yükle</span>
+        </button>
         <button class="button request-open glass-surface" id="request-open" type="button" aria-controls="request-dialog" aria-haspopup="dialog">
           <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg><span class="request-label">Sepet</span><span id="request-count" hidden></span>
         </button>
@@ -257,12 +264,44 @@
       </label>
     </div>
     <footer class="request-footer">
+      <p class="request-total" id="request-total" hidden><span>Katalog toplamı</span><strong id="request-total-amount"></strong></p>
       <div class="request-actions">
         <button class="button request-copy" id="request-copy" type="button"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Talebi kopyala</button>
         <a class="button button-accent" id="request-send" target="_blank" rel="noopener noreferrer">WhatsApp’ta aç <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
       </div>
       <p id="request-status" class="request-status" role="status"></p>
     </footer>
+  </dialog>
+  <dialog class="wholesale-admin-dialog" id="wholesale-admin-dialog" aria-labelledby="wholesale-admin-title">
+    <header class="wholesale-admin-heading">
+      <h2 id="wholesale-admin-title">Toptan kataloğu yükle</h2>
+      <form method="dialog"><button class="button icon-button" id="wholesale-admin-close" type="submit" aria-label="Kapat">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+      </button></form>
+    </header>
+    <form class="wholesale-admin-form" id="wholesale-admin-form" method="dialog">
+      <label class="wholesale-admin-field">Shopify katalog CSV dosyası
+        <input id="wholesale-admin-file" type="file" accept=".csv,text/csv" required>
+      </label>
+      <label class="wholesale-admin-field" id="wholesale-admin-catalog-field" hidden>Katalog
+        <select id="wholesale-admin-catalog"></select>
+      </label>
+      <section class="wholesale-admin-summary" id="wholesale-admin-summary" aria-labelledby="wholesale-admin-summary-title" hidden>
+        <h3 id="wholesale-admin-summary-title"></h3>
+        <p id="wholesale-admin-summary-date"></p>
+        <dl>
+          <div><dt>Görünür</dt><dd id="wholesale-admin-visible"></dd></div>
+          <div><dt>Gizli</dt><dd id="wholesale-admin-hidden"></dd></div>
+          <div><dt>Eşleşmeyen</dt><dd id="wholesale-admin-unmatched"></dd></div>
+        </dl>
+      </section>
+      <p class="wholesale-admin-status" id="wholesale-admin-status" role="status"></p>
+      <div class="wholesale-admin-actions">
+        <button class="button" id="wholesale-admin-preview" type="submit">Önizle</button>
+        <button class="button button-accent" id="wholesale-admin-publish" type="button" hidden>Yayımla</button>
+        <button class="button button-accent" id="wholesale-admin-done" type="button" hidden>Tamam</button>
+      </div>
+    </form>
   </dialog>
   <div class="toast" id="toast" aria-hidden="true" hidden><span class="toast-icon" id="toast-icon"></span><span id="toast-message"></span></div>
   <div class="sr-only" id="toast-announcement" role="status"></div>

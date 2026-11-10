@@ -1,7 +1,8 @@
-import { initRequest, addToRequest, hydrateRequest, requestCount } from './request.js';
+import { initRequest, addToRequest, hydrateRequest, requestCount, requestStock, requestAvailability } from './request.js';
 import { initColumnReorder } from './column-reorder.js';
 import { initColumnWidths } from './column-widths.js';
 import { initBackdropDismiss } from './dialog-dismiss.js';
+import { applyWholesale, salePrice, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 
 const get = (id) => document.getElementById(id);
 const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -62,6 +63,9 @@ try {
 }
 
 let catalog;
+let storefrontData;
+let loadRevision = 0;
+let refreshOpenProductStock;
 let familiesByHandle = new Map();
 let familiesOnPage = new Map();
 const rowVariantSelections = new Map();
@@ -385,7 +389,7 @@ function rowVariantState(summary, selection = currentRowVariantSelection(summary
     offer === searched.offer && String(variant?.id ?? offer.id) === String(searched.variantId ?? offer.id)))
     ?? (matches.length === 1 ? matches[0] : null);
   const cases = !selected.quantity && valueOf('case-only') === 'yes'
-    ? matches.filter(({ variant }) => isCaseOption(variant))
+    ? matches.filter(({ offer, variant }) => isCaseSale(offer, variant))
     : [];
   const hasPrice = ({ offer, variant }) => Number.isFinite(productPrice(offer, variant));
   const fallback = cases.length ? cases : matches;
@@ -407,7 +411,7 @@ function rowVariantCell(field, row, card = false) {
     const amount = key === 'quantity' ? formatNumber(row.quantity) : '';
     return card && amount ? tableLabel(`${amount} adet`, 'card-variant-value') : amount;
   }
-  if (choices.size === 1 && !selected) {
+  if (choices.size === 1) {
     return tableLabel(choices.values().next().value, card ? 'card-variant-value' : '');
   }
   const options = [...choices].map(([value, text]) =>
@@ -443,7 +447,7 @@ function cardImageContent(source) {
   return source ? `<img src="${escape(source)}" alt="" loading="lazy" decoding="async">` : icon('box');
 }
 
-const hasVariantControl = ({ choices, selected }) => choices.size > 1 || Boolean(selected);
+const hasVariantControl = ({ choices }) => choices.size > 1;
 
 function cardOptionsLabel(fields) {
   const controls = fields.filter(hasVariantControl);
@@ -586,7 +590,7 @@ function visibleRows(filters, badRange) {
     if (words.length && !words.every((word) => row.searchText.includes(word))) return false;
     if (filters.stock === 'in' && !availableStocks.has(row.stock)) return false;
     if (filters.stock && filters.stock !== 'in' && filters.stock !== row.stock) return false;
-    if (hasCase && Boolean(caseOption(row)) !== (hasCase === 'yes')) return false;
+    if (hasCase && Boolean(row.variants?.some((variant) => isCaseSale(row, variant))) !== (hasCase === 'yes')) return false;
     if (minCase && (row.caseSize == null || row.caseSize < Number(minCase))) return false;
     return (!low && !high) || variantsInPriceRange(row, low, high).length > 0;
   });
@@ -792,7 +796,8 @@ function displayCatalog(data, source) {
     if (!familiesByHandle.has(row.handle)) familiesByHandle.set(row.handle, []);
     familiesByHandle.get(row.handle).push(row);
   }
-  hydrateRequest(data.rows);
+  hydrateRequest(data.rows, Boolean(data.wholesale));
+  refreshOpenProductStock?.();
   get('product-total').textContent = number.format(data.productCount);
   get('type-total').textContent = number.format(data.types.length);
   get('brand-total').textContent = number.format(data.brands.length);
@@ -816,24 +821,39 @@ async function getData(url, timeout) {
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error('Katalog yanıtı alınamadı');
-    const data = await response.json();
-    if (!Array.isArray(data.rows) || !data.rows.length) throw new Error('Katalog verisi boş');
-    return data;
+    return await response.json();
   } finally {
     clearTimeout(timer);
   }
 }
 
 async function load() {
+  const revision = ++loadRevision;
   setStatus('loading');
-  const live = getData('/api/catalog', 29000).catch(() => null);
-  if (!catalog) {
-    const snapshot = await getData('/catalog-data.json', 10000).catch(() => null);
-    if (snapshot) displayCatalog(snapshot, 'snapshot');
+  const storefront = async (url, timeout) => {
+    const data = await getData(url, timeout).catch(() => null);
+    return data && Array.isArray(data.rows) && data.rows.length ? data : null;
+  };
+  const live = storefront('/api/catalog', 29000);
+  const snapshot = storefrontData ?? storefront('/catalog-data.json', 10000);
+  const overlay = await getData('/api/wholesale', 10000).catch(() => null);
+  if (revision !== loadRevision) return;
+  if (!(overlay?.active === false || (overlay?.active === true && overlay.products))) {
+    setStatus(catalog ? 'saved' : 'error');
+    render();
+    return;
+  }
+  const saved = await snapshot;
+  if (revision !== loadRevision) return;
+  if (saved) {
+    storefrontData = saved;
+    displayCatalog(applyWholesale(saved, overlay), 'snapshot');
   }
   const data = await live;
+  if (revision !== loadRevision) return;
   if (data) {
-    displayCatalog(data, 'live');
+    storefrontData = data;
+    displayCatalog(applyWholesale(data, overlay), 'live');
   } else {
     setStatus(catalog ? 'saved' : 'error');
     render();
@@ -943,7 +963,11 @@ function preferredVariant(row, variantId) {
 }
 
 function productPrice(row, variant) {
-  return !variant || String(variant.id) === String(row.id) ? row.price ?? variant?.price : variant.price;
+  const price = salePrice(row, variant);
+  const rule = wholesaleRule(row, variant);
+  if (!rule?.tiers?.length) return price;
+  const cents = wholesaleUnitCents(rule, price, wholesaleLimits(rule).minimum);
+  return cents == null ? null : cents / 100;
 }
 
 const isCaseOption = (variant) => variant?.label?.startsWith('1 koli');
@@ -953,12 +977,17 @@ function renderProductAttributes(row, variant) {
   const primary = !variant || String(variant.id) === String(row.id);
   const selectedCase = isCaseOption(variant);
   const price = productPrice(row, variant);
+  const rule = wholesaleRule(row, variant);
+  const limits = wholesaleLimits(rule);
+  const compareAt = variant?.compareAtPrice ?? (primary ? row.compareAtPrice : null);
+  const compare = price != null && compareAt > price ? money(compareAt) : '';
   const barcode = variant?.barcode ?? (primary ? row.barcode : null);
   const caseBarcode = selectedCase ? barcode ?? row.caseBarcode : row.caseBarcode;
   const sku = variant?.sku || (primary ? row.sku : null);
-  const stock = variant?.available === true ? 'in' : variant?.available === false ? 'out' : row.stock;
+  const stock = requestStock(row, variant);
   const attributes = [
-    ['Fiyat', price == null ? null : money(price)],
+    [rule ? 'Satış birimi fiyatı' : 'Fiyat', price == null ? null :
+      `${money(price)}${compare ? ` <del class="detail-compare-price">${compare}</del>` : ''}`],
     ['Satış adedi', !variant && row.quantity > 1 ? formatNumber(row.quantity) : null],
     ['Koli içi', row.caseSize == null ? null : caseAmount(row)],
     ['Barkod', !selectedCase && barcode ? escape(barcode) : null],
@@ -968,6 +997,16 @@ function renderProductAttributes(row, variant) {
   ];
   get('detail-attributes').innerHTML = attributes.filter(([, value]) => value != null)
     .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('');
+  const rules = get('detail-wholesale');
+  const order = [
+    rule?.minimum && `En az ${formatNumber(limits.minimum)}`,
+    rule?.increment > 1 && `Artış adımı ${formatNumber(limits.increment)}`,
+    rule?.maximum && `En çok ${formatNumber(limits.maximum)}`,
+  ].filter(Boolean);
+  rules.hidden = !order.length && !rule?.tiers?.length;
+  rules.innerHTML = `${order.length ? `<p>Sipariş miktarı (satış birimi) · ${order.join(' · ')}</p>` : ''}
+    ${rule?.tiers?.length ? `<dl class="detail-price-tiers" aria-label="Miktara göre satış birimi fiyatı">${rule.tiers.map(({ quantity, price: tierPrice }) =>
+      `<div><dt>${formatNumber(quantity)} ve üzeri</dt><dd>${wholesaleMoney(Math.round(tierPrice * 100))} / birim</dd></div>`).join('')}</dl>` : ''}`;
 }
 
 const installmentQuotes = new Map();
@@ -1032,17 +1071,25 @@ function renderInstallmentPlans(container, { amount, programs }) {
 
 const detailSelectCaption = '<button type="button"><selectedcontent></selectedcontent></button>';
 
+function caseMultiple(row, variant) {
+  const { caseSize, caseUnit } = row;
+  if (!Number.isSafeInteger(caseSize) || caseSize < 1 || !(row.hadCaseOption || caseOption(row))) return null;
+  const [, amount, unit] = /^(\d+) (adet|birim)$/.exec(variant?.label ?? '') ?? [];
+  const count = Number(amount);
+  return unit === caseUnit && Number.isSafeInteger(count) && count > caseSize && count % caseSize === 0
+    ? { count, cases: count / caseSize, unit } : null;
+}
+
+function isCaseSale(row, variant) {
+  return isCaseOption(variant) || Boolean(row.hadCaseOption && caseMultiple(row, variant));
+}
+
 function saleOptionLabel(row, variant) {
   const label = variant.label;
   const original = variant.optionValue?.trim();
   const displayLabel = original && !/^\d+(?:\.\d{3})*$/.test(original) ? original : label;
-  const { caseSize, caseUnit } = row;
-  if (!Number.isSafeInteger(caseSize) || caseSize < 1 || !caseOption(row)) return displayLabel;
-
-  const [, amount, unit] = /^(\d+) (adet|birim)$/.exec(label) ?? [];
-  const count = Number(amount);
-  if (unit !== caseUnit || !Number.isSafeInteger(count) || count <= caseSize || count % caseSize !== 0) return displayLabel;
-  return `${number.format(count / caseSize)} koli · ${number.format(count)} ${unit}`;
+  const multiple = caseMultiple(row, variant);
+  return multiple ? `${number.format(multiple.cases)} koli · ${number.format(multiple.count)} ${multiple.unit}` : displayLabel;
 }
 
 function saleOptions(row, selected) {
@@ -1131,9 +1178,11 @@ function showProduct(row, family = [row], variantId) {
       </div>` : ''}
       ${hasPackages ? `<div class="detail-variant">
         <label id="detail-variant-label" for="detail-variant">${escape(offer.saleOptionName || familyPackageName)}</label>
-        <div class="select-wrap detail-select"><select class="catalog-select" id="detail-variant" ${offer.variants?.length ? '' : 'disabled'}>${saleOptions(offer, selected)}</select>${icon('down')}</div>
+        <span class="detail-variant-value" id="detail-variant-fixed" hidden></span>
+        <div class="select-wrap detail-select"><select class="catalog-select" id="detail-variant">${saleOptions(offer, selected)}</select>${icon('down')}</div>
       </div>` : ''}
       <dl class="detail-grid" id="detail-attributes"></dl>
+      <div class="detail-wholesale" id="detail-wholesale" hidden></div>
       <div class="detail-actions">
         <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Sepeti aç</button>
         <button class="button button-accent" id="detail-add" type="button">Sepete ekle</button>
@@ -1170,6 +1219,7 @@ function showProduct(row, family = [row], variantId) {
   const traitSelects = activeTraits ? traits.axes.map(({ position }) => get(`detail-trait-${position}`)) : [];
   const packageSelect = get('detail-variant');
   const packageLabel = get('detail-variant-label');
+  const packageFixed = get('detail-variant-fixed');
   const gallery = get('detail-gallery');
   const shop = get('detail-shop');
   let galleryLead = selected?.image || offer.image;
@@ -1274,8 +1324,14 @@ function showProduct(row, family = [row], variantId) {
   }
 
   function showRequestAction(added) {
-    openRequest.hidden = !added;
-    addButton.hidden = added;
+    const unavailable = requestAvailability(offer, selected);
+    const wasSoldOut = addButton.disabled;
+    openRequest.hidden = !added || Boolean(unavailable);
+    addButton.hidden = !openRequest.hidden;
+    addButton.disabled = Boolean(unavailable);
+    addButton.textContent = unavailable === 'out' ? 'Tükendi' : unavailable ? 'Katalog dışı' : 'Sepete ekle';
+    if (unavailable) detailStatus.textContent = unavailable === 'out' ? 'Seçilen seçenek tükendi.' : 'Seçilen seçenek katalogdan kaldırıldı.';
+    else if (wasSoldOut) detailStatus.textContent = '';
   }
 
   function updateSelection() {
@@ -1297,14 +1353,21 @@ function showProduct(row, family = [row], variantId) {
     }
   }
 
+  function updatePackageControl() {
+    if (!packageSelect) return;
+    const fixed = Boolean(catalog.wholesale) && (offer.variants?.length ?? 0) < 2;
+    packageSelect.innerHTML = saleOptions(offer, selected);
+    packageSelect.disabled = !offer.variants?.length || fixed;
+    packageSelect.parentElement.hidden = fixed;
+    packageFixed.hidden = !fixed;
+    packageFixed.textContent = selected ? saleOptionLabel(offer, selected) : offer.saleOptionValue || 'Standart';
+    packageLabel.textContent = offer.saleOptionName || familyPackageName;
+  }
+
   function selectOffer(next, preferredId) {
     offer = next;
     selected = preferredVariant(offer, preferredId);
-    if (packageSelect) {
-      packageSelect.innerHTML = saleOptions(offer, selected);
-      packageSelect.disabled = !offer.variants?.length;
-      packageLabel.textContent = offer.saleOptionName || familyPackageName;
-    }
+    updatePackageControl();
     updateSelection();
   }
 
@@ -1339,8 +1402,12 @@ function showProduct(row, family = [row], variantId) {
   addButton.addEventListener('click', () => {
     const option = selected && { ...selected, label: saleOptionLabel(offer, selected) };
     const added = addToRequest(offer, option);
-    detailError.hidden = added;
-    if (!added) return;
+    if (!added) {
+      showRequestAction(false);
+      detailError.hidden = addButton.disabled;
+      return;
+    }
+    detailError.hidden = true;
     detailStatus.textContent = `Sepete eklendi. Toplam miktar ${number.format(requestCount())}.`;
     if (openRequest.hidden) {
       showRequestAction(true);
@@ -1351,7 +1418,18 @@ function showProduct(row, family = [row], variantId) {
     dialog.close();
     get('request-open').click();
   });
-  dialog.addEventListener('close', cancelInstallments, { once: true });
+  const refreshStock = () => {
+    if (!dialog.open) return;
+    renderProductAttributes(offer, selected);
+    showRequestAction(!openRequest.hidden);
+  };
+  refreshOpenProductStock = refreshStock;
+  dialog.addEventListener('close', () => {
+    cancelInstallments();
+    if (refreshOpenProductStock === refreshStock) refreshOpenProductStock = undefined;
+  }, { once: true });
+  updatePackageControl();
+  showRequestAction(false);
   dialog.showModal();
   dialog.scrollTop = 0;
   detail.scrollTop = 0;
@@ -1757,4 +1835,5 @@ get('share').addEventListener('click', async () => {
 });
 
 initRequest();
+window.addEventListener('wholesale:published', load);
 load();

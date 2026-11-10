@@ -26,6 +26,10 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+  --contact-size: 56px;
+  --contact-gap: 10px;
+  --contact-inset: 16px;
+  --contact-clearance: calc(2 * var(--contact-size) + var(--contact-gap) + var(--contact-inset));
   --glass-shadow: 0 1px 2px rgb(32 37 58 / .05), 0 7px 24px rgb(32 37 58 / .07);
   --menu-shadow: 0 12px 34px rgb(32 37 58 / .15);
 }
@@ -1009,6 +1013,40 @@ kbd {
 .page-size select { font-size: 12px; }
 .page-label { min-width: 43px; text-align: center; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .sync { padding: 5px 0; }
+
+.floating-contact {
+  position: fixed;
+  z-index: 6;
+  right: calc(var(--safe-right) + var(--contact-inset));
+  bottom: calc(var(--safe-bottom) + var(--contact-inset) + var(--contact-pagination, 0px) + var(--contact-status, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--contact-gap);
+}
+.catalog-main:has(.catalog:not([hidden]) #pagination:not([hidden])) ~ .floating-contact { --contact-pagination: 62px; }
+.catalog-main:has(#sync:not([hidden])) ~ .floating-contact { --contact-status: 26px; }
+.floating-contact a {
+  display: grid;
+  place-items: center;
+  width: var(--contact-size);
+  height: var(--contact-size);
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(0 0 0 / .2);
+}
+.floating-contact svg { width: 50%; height: 50%; fill: currentColor; }
+:is(.category-menu, .card-scroll, .table-scroll) { padding-block-end: var(--contact-clearance); }
+@media (max-width: 749px) {
+  :root { --contact-size: 52px; --contact-inset: 12px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --contact-size: 44px; --contact-gap: 8px; --contact-inset: 10px; }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .floating-contact a { transition: transform .15s ease; }
+  .floating-contact a:hover { transform: scale(1.1); }
+}
 
 .product-dialog, .request-dialog {
   width: calc(100% - 24px);

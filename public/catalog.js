@@ -28,22 +28,21 @@ const defaults = Object.fromEntries(filterIds.map((id) => [id, '']));
 const rowVariantKeys = ['variant1', 'variant2', 'quantity'];
 const columns = [
   { key: 'name', label: 'Ürün' },
-  { key: 'type', label: 'Tür' },
-  { key: 'brand', label: 'Marka', optional: true },
+  { key: 'price', label: 'Fiyat', numeric: true },
   { key: 'variant1', label: 'Varyasyon 1', sortable: false },
   { key: 'variant2', label: 'Varyasyon 2', sortable: false },
   { key: 'quantity', label: 'Adet' },
-  { key: 'price', label: 'Fiyat', numeric: true },
-  { key: 'sku', label: 'Ürün kodu', optional: true },
-  { key: 'barcode', label: 'Barkod' },
-  { key: 'caseBarcode', label: 'Koli barkodu', optional: true },
   { key: 'caseSize', label: 'Koli içi', numeric: true },
+  { key: 'type', label: 'Tür', optional: true },
+  { key: 'brand', label: 'Marka', optional: true },
+  { key: 'sku', label: 'Ürün kodu', optional: true },
+  { key: 'barcode', label: 'Barkod', optional: true },
+  { key: 'caseBarcode', label: 'Koli barkodu', optional: true },
 ];
 const mobileLayout = matchMedia('(max-width: 740px), (orientation: landscape) and (max-height: 500px) and (max-width: 1024px)');
 const columnsByKey = new Map(columns.map((column) => [column.key, column]));
 const defaultColumnOrder = columns.map(({ key }) => key);
-const mobileLeadingColumns = ['name', 'price', ...rowVariantKeys];
-const mobileColumnOrder = [...mobileLeadingColumns, ...defaultColumnOrder.filter((key) => !mobileLeadingColumns.includes(key))];
+const defaultHiddenColumns = columns.filter(({ optional }) => optional).map(({ key }) => key);
 const columnSettingsKey = 'alacam-katalog-sutunlar-v3';
 const viewStorageKey = 'alacam-katalog-gorunum-v1';
 const pinnedColumnKey = 'name';
@@ -55,8 +54,14 @@ const cardOptionsDialog = get('card-options-dialog');
 const cardOptionsFields = get('card-options-fields');
 const viewControl = get('catalog-view');
 const categoryMenu = get('category-menu');
+const categoryTools = get('category-menu-tools');
+const categoryFeatured = get('category-featured');
+const categoryIndex = get('category-index');
+const categoryIndexTitle = get('category-index-title');
+const categoryIndexOrder = get('category-index-order');
 const categoryGrid = get('category-grid');
 const categorySearch = get('category-search');
+const categorySearchClear = get('category-search-clear');
 const categoryAll = get('category-all');
 const categoryResults = get('category-results-nav');
 const categoryTitle = get('category-results-title');
@@ -65,6 +70,7 @@ let catalogView = 'list';
 let cardOptionsHandle = null;
 let browsingCategories = true;
 let categories = [];
+let featuredTypes = new Set();
 let lastCategory = '';
 let categoryScrollTop = 0;
 
@@ -103,7 +109,7 @@ const hiddenColumns = new Set(Array.isArray(columnSettings?.hidden)
   ? columnSettings.hidden.filter((key) => columnsByKey.has(key) && key !== pinnedColumnKey
     && !(columnSettingsVersion < 3 && key === 'price')
     && !(columnSettingsVersion === 1 && rowVariantKeys.includes(key)))
-  : columns.filter(({ optional }) => optional).map(({ key }) => key));
+  : defaultHiddenColumns);
 
 const valueOf = (id) => get(id).value;
 const getFilters = () => Object.fromEntries(filterIds.map((id) => [id, valueOf(id)]));
@@ -252,7 +258,7 @@ function normalizeColumnOrder(order) {
 }
 
 function currentColumnOrder() {
-  return customColumnOrder ?? (mobileLayout.matches ? mobileColumnOrder : defaultColumnOrder);
+  return customColumnOrder ?? defaultColumnOrder;
 }
 
 function saveColumnSettings() {
@@ -702,6 +708,7 @@ function renderChips(filters) {
 function render(focusChoice) {
   const showCategories = browsingCategories && categories.length > 0;
   categoryMenu.hidden = !showCategories;
+  categoryTools.hidden = !showCategories;
   productResults.hidden = showCategories;
   document.body.classList.toggle('is-category-menu', showCategories || (!catalog && state === 'loading'));
   if (showCategories) return;
@@ -813,14 +820,40 @@ function resetFilters() {
 }
 
 function categoryButton(type) {
-  return type ? categoryGrid.querySelector(`[data-category="${CSS.escape(type)}"]`) : categoryAll;
+  if (!type) return categoryAll;
+  const grid = !categoryFeatured.hidden && featuredTypes.has(type) ? categoryFeatured : categoryGrid;
+  const button = grid.querySelector(`[data-category="${CSS.escape(type)}"]`);
+  return button?.closest('[hidden]') ? null : button;
+}
+
+function filterCategories() {
+  const query = fold(categorySearch.value).trim();
+  const words = query ? query.split(/\s+/) : [];
+  let count = 0;
+  for (const tile of categoryGrid.children) {
+    const type = tile.firstElementChild.dataset.category;
+    const name = fold(type);
+    tile.hidden = query ? !words.every((word) => name.includes(word)) : featuredTypes.has(type);
+    if (!tile.hidden) count += 1;
+  }
+  categorySearchClear.hidden = !categorySearch.value;
+  categoryFeatured.hidden = Boolean(query) || !featuredTypes.size;
+  categoryIndex.hidden = !count;
+  categoryIndexTitle.textContent = query ? 'Arama sonuçları' : 'Diğer türler';
+  categoryIndexOrder.hidden = Boolean(query);
+  get('category-empty').hidden = !query || Boolean(count);
+  get('category-feedback').textContent = !query ? '' : count
+    ? `${number.format(count)} ürün türü bulundu.` : 'Eşleşen ürün türü bulunamadı.';
 }
 
 function refreshCategoryGrid() {
-  const focusedType = categoryGrid.contains(document.activeElement) && document.activeElement.dataset.category;
-  const count = renderCategoryCards(categoryGrid, categories, categorySearch.value);
-  get('category-empty').hidden = Boolean(count);
-  if (focusedType) (categoryButton(focusedType) ?? categoryAll).focus({ preventScroll: true });
+  const focusedType = categoryMenu.contains(document.activeElement) && document.activeElement.dataset.category;
+  const featured = categories.slice(0, 4);
+  featuredTypes = new Set(featured.map(({ type }) => type));
+  renderCategoryCards(categoryFeatured, featured, true);
+  renderCategoryCards(categoryGrid, [...categories].sort((a, b) => collator.compare(a.type, b.type)));
+  filterCategories();
+  if (focusedType) (categoryButton(focusedType) ?? categorySearch).focus({ preventScroll: true });
 }
 
 function openCategory(type = '') {
@@ -1702,8 +1735,31 @@ compactSearch.addEventListener('change', () => {
 });
 
 for (const id of filterIds) get(id).addEventListener('input', resetPage);
-categorySearch.addEventListener('input', refreshCategoryGrid);
-categoryGrid.addEventListener('click', ({ target }) => {
+function updateCategorySearch() {
+  filterCategories();
+  categoryMenu.scrollTop = 0;
+}
+
+function clearCategorySearch() {
+  categorySearch.value = '';
+  categorySearch.focus();
+  updateCategorySearch();
+}
+
+categorySearch.addEventListener('input', updateCategorySearch);
+categorySearchClear.addEventListener('click', clearCategorySearch);
+categorySearch.addEventListener('keydown', (event) => {
+  if (event.isComposing || !categorySearch.value) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    clearCategorySearch();
+  }
+  if (event.key === 'Enter' && categorySearch.value.trim()) {
+    const matches = categoryGrid.querySelectorAll('.category-tile:not([hidden]) > button');
+    if (matches.length === 1) openCategory(matches[0].dataset.category);
+  }
+});
+categoryMenu.addEventListener('click', ({ target }) => {
   const button = target.closest('button[data-category]');
   if (button) openCategory(button.dataset.category);
 });
@@ -1835,7 +1891,6 @@ const columnsReset = get('columns-reset');
 const columnOrderStatus = get('column-order-status');
 for (const { key, label } of columns) {
   const { item, input } = menuCheckbox(key, label);
-  input.checked = !hiddenColumns.has(key);
   input.disabled = key === pinnedColumnKey;
   const row = document.createElement('div');
   row.className = 'column-option';
@@ -1866,9 +1921,18 @@ for (const { key, label } of columns) {
   columnRows.set(key, row);
 }
 
+function updateColumnReset() {
+  columnsReset.hidden = !customColumnOrder && hiddenColumns.size === defaultHiddenColumns.length
+    && defaultHiddenColumns.every((key) => hiddenColumns.has(key));
+}
+
 function syncColumnMenu() {
-  for (const key of currentColumnOrder()) columnOptions.append(columnRows.get(key));
-  columnsReset.hidden = !customColumnOrder;
+  for (const key of currentColumnOrder()) {
+    const row = columnRows.get(key);
+    row.querySelector('input').checked = !hiddenColumns.has(key);
+    columnOptions.append(row);
+  }
+  updateColumnReset();
 }
 
 syncColumnMenu();
@@ -1886,16 +1950,19 @@ columnOptions.addEventListener('change', (event) => {
   if (event.target.type !== 'checkbox' || event.target.value === pinnedColumnKey) return;
   if (event.target.checked) hiddenColumns.delete(event.target.value);
   else hiddenColumns.add(event.target.value);
+  updateColumnReset();
   saveColumnSettings();
   render();
 });
 columnsReset.addEventListener('click', () => {
   cancelColumnReorder();
   customColumnOrder = null;
+  hiddenColumns.clear();
+  for (const key of defaultHiddenColumns) hiddenColumns.add(key);
   syncColumnMenu();
   saveColumnSettings();
   render();
-  columnOrderStatus.textContent = 'Varsayılan sütun sırası geri yüklendi.';
+  columnOrderStatus.textContent = 'Varsayılan sütun düzeni geri yüklendi.';
   get('columns-done').focus({ preventScroll: true });
 });
 function closeColumnPicker(restoreFocus = true) {
@@ -1940,7 +2007,6 @@ columnPicker.addEventListener('focusout', (event) => {
 });
 mobileLayout.addEventListener('change', () => {
   cancelColumnReorder();
-  if (!customColumnOrder) syncColumnMenu();
   render();
 });
 const toolbarDismiss = get('toolbar-dismiss');

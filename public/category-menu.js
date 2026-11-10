@@ -4,17 +4,12 @@ const imageHosts = new Set(['cdn.shopify.com', 'alacamdagitim.com']);
 const stockPriority = { in: 3, case: 3, other: 3, unknown: 2, out: 1 };
 const svgNamespace = 'http://www.w3.org/2000/svg';
 
-function fold(value) {
-  return value.toLocaleLowerCase('tr').replaceAll('ı', 'i')
-    .normalize('NFD').replace(/\p{M}/gu, '');
-}
-
-function thumbnail(value) {
+function thumbnail(value, width = 360) {
   if (!value) return null;
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:' || !imageHosts.has(url.hostname) || url.username || url.password) return null;
-    url.searchParams.set('width', '360');
+    url.searchParams.set('width', width);
     return url.href;
   } catch {
     return null;
@@ -59,7 +54,7 @@ function icon(doc, name) {
   return svg;
 }
 
-function cardMedia(doc, category) {
+function cardMedia(doc, category, featured) {
   const media = doc.createElement('span');
   media.className = 'category-card-media';
   if (!category.image) {
@@ -69,20 +64,21 @@ function cardMedia(doc, category) {
 
   const image = doc.createElement('img');
   const fallbacks = (category.fallbackImages ?? [])[Symbol.iterator]();
+  const width = featured ? 360 : 120;
   image.alt = '';
-  image.loading = 'lazy';
+  image.loading = featured ? 'eager' : 'lazy';
   image.decoding = 'async';
   image.addEventListener('error', () => {
     const next = fallbacks.next();
     if (next.done) media.replaceChildren(icon(doc, 'box'));
-    else image.src = next.value;
+    else image.src = thumbnail(next.value, width);
   });
-  image.src = category.image;
+  image.src = thumbnail(category.image, width);
   media.append(image);
   return media;
 }
 
-function categoryCard(doc, category) {
+function categoryCard(doc, category, featured) {
   const item = doc.createElement('li');
   const button = doc.createElement('button');
   const info = doc.createElement('span');
@@ -103,24 +99,11 @@ function categoryCard(doc, category) {
   arrow.append(icon(doc, 'right'));
 
   info.append(title, count, arrow);
-  button.append(cardMedia(doc, category), info);
+  button.append(cardMedia(doc, category, featured), info);
   item.append(button);
   return item;
 }
 
-export function renderCategoryCards(grid, categories, query = '') {
-  const words = fold(query).trim().split(/\s+/).filter(Boolean);
-  const doc = grid.ownerDocument;
-  const cards = doc.createDocumentFragment();
-  let count = 0;
-
-  for (const category of categories) {
-    const type = fold(category.type);
-    if (!words.every((word) => type.includes(word))) continue;
-    cards.append(categoryCard(doc, category));
-    count += 1;
-  }
-
-  grid.replaceChildren(cards);
-  return count;
+export function renderCategoryCards(grid, categories, featured = false) {
+  grid.replaceChildren(...categories.map((category) => categoryCard(grid.ownerDocument, category, featured)));
 }

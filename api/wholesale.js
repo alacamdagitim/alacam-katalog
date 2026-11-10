@@ -1,7 +1,12 @@
-const { matchWholesaleCatalog, readWholesale, wholesaleStorage, writeWholesale, WholesaleWriteConflict } = require('../lib/wholesale.cjs');
+const { createHash } = require('node:crypto');
+const { matchWholesaleCatalog, readWholesale, readWholesaleSnapshot, wholesaleStorage, writeWholesale, WholesaleWriteConflict } = require('../lib/wholesale.cjs');
 
 const maxUploadBytes = 3_500_000;
 const storageError = 'Toptan katalog deposuna şu anda erişilemiyor.';
+const expiredPreview = {
+  code: 'preview_expired',
+  error: 'Önizleme güncelliğini yitirdi. Yayımlamadan önce dosyayı yeniden önizleyin.',
+};
 
 class UploadError extends Error {
   constructor(status, message) {
@@ -77,8 +82,16 @@ module.exports = async (request, response) => {
   const params = new URL(request.url, 'http://localhost').searchParams;
   const preview = params.get('preview') === '1';
   const catalogTitle = params.get('catalog');
+  const mode = params.get('mode');
   if ((params.has('preview') && !preview) || params.getAll('preview').length > 1 || params.getAll('catalog').length > 1) {
     return send(400, { error: 'Katalog yükleme isteği geçersiz.' });
+  }
+  if (params.getAll('mode').length !== 1 || (mode !== 'merge' && mode !== 'replace')) {
+    return send(400, { error: 'Kataloğu nasıl güncelleyeceğinizi seçin.' });
+  }
+  const suppliedToken = request.headers['x-catalog-preview'];
+  if (!preview && (typeof suppliedToken !== 'string' || !/^[a-f0-9]{64}$/.test(suppliedToken))) {
+    return send(409, expiredPreview);
   }
   try {
     const storage = wholesaleStorage();
@@ -99,22 +112,27 @@ module.exports = async (request, response) => {
     if (!catalog) {
       return send(409, { error: 'Yayınlanacak kataloğu seçin.', catalogs });
     }
-    const { products, stats } = matchWholesaleCatalog(catalog, parser);
-    const result = { preview, catalog: catalog.title, catalogs, stats };
-    if (preview) return send(200, result);
-    if (!stats.matchedVariants) return send(422, { error: 'Hiçbir satış seçeneği mağaza kataloğuyla eşleşmedi.' });
-    if (!stats.visibleVariants) return send(422, { error: 'Dosyada yayımlanabilir satış seçeneği bulunamadı.' });
-
+    const { publication: previous, revision } = await readWholesaleSnapshot(storage);
+    const { products, stats, changes } = matchWholesaleCatalog(catalog, parser, {
+      mode, previousProducts: previous?.products,
+    });
+    const result = { preview, mode, catalog: catalog.title, catalogs, stats, changes, hasActive: Boolean(previous) };
     const publishedAt = new Date().toISOString();
     const publication = { publishedAt, products };
     if (Buffer.byteLength(JSON.stringify(publication)) > maxUploadBytes) {
       throw new UploadError(422, 'Eşleşen katalog verisi 3,5 MB sınırını aşıyor.');
     }
-    await writeWholesale(storage, publication);
+    const previewToken = stats.matchedVariants && stats.visibleVariants
+      ? createHash('sha256').update(JSON.stringify([revision, mode, catalog.title, csv, products, stats, changes])).digest('hex')
+      : null;
+    if (preview) return send(200, { ...result, previewToken });
+    if (previewToken !== suppliedToken) return send(409, expiredPreview);
+
+    await writeWholesale(storage, publication, revision);
     return send(200, { ...result, publishedAt });
   } catch (error) {
     if (error instanceof UploadError) return send(error.status, { error: error.message });
-    if (error instanceof WholesaleWriteConflict) return send(409, { error: 'Başka bir yayın tamamlandı. Dosyayı yeniden kontrol edin.' });
+    if (error instanceof WholesaleWriteConflict) return send(409, expiredPreview);
     return send(503, { error: storageError });
   }
 };

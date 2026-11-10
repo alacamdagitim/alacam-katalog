@@ -28,8 +28,9 @@ Taksit seçenekleri seçili satış tutarı için PayTR’den alınır. Varsayı
 
 1. Vercel projesinin **Storage** bölümünde bir **Private Blob** deposu oluşturup üretim ortamına bağlayın. Bağlantıdan sonra güncel kodu dağıtın.
 2. Ana katalog sayfasında **Katalog yükle** düğmesinden UTF-8 Shopify katalog CSV dosyasını seçin. Dosya en fazla 3,5 MB olabilir.
-3. **Önizle** ile sayıları kontrol edin, sonra **Yayımla** ile etkin kataloğu güncelleyin. Katalog bağlantısını açan herkes geçerli bir dosyayla yayımlama yapabilir. Müşteriler sayfayı yenileyerek yeni yayını görebilir.
+3. Her dosya için **Mevcut kataloğu güncelle** veya **Sıfırdan oluştur** seçeneğini işaretleyin. İlk seçenek, dosyada yer almayan mevcut toptan kayıtları korur. İkinci seçenek kataloğu yüklenen dosyadaki görünür varyantlardan oluşturur. İlk yayında her iki seçenek de dosyadan yeni bir katalog oluşturur.
+4. **Önizle** ile eklenecek, güncellenecek, korunacak ve kaldırılacak varyant sayılarını kontrol edin. **Yayımla** ile işlemi tamamlayın. Önizlemeden sonra katalog değişirse dosyayı yeniden önizleyin. Katalog bağlantısını açan herkes geçerli bir dosyayla yayımlama yapabilir.
 
-Yayın, CSV’deki ürünleri paketlenmiş mağaza kaydıyla Shopify ürün tanıtıcısı ve sıralı seçenek adları/değerleri üzerinden eşleştirir. Yalnızca eşleşen ve yayına açık seçenekler görünür. Shopify’a yeni eklenen ürünler eşleşmiyorsa `npm run sync` ile mağaza kaydını güncelleyin, yeni kaydı dağıtın ve CSV’yi tekrar yayımlayın. Özel depoda eşleştirilmiş yayın verisi tutulur.
+Yayın, CSV’deki ürünleri paketlenmiş mağaza kaydıyla Shopify ürün tanıtıcısı ve sıralı seçenek adları/değerleri üzerinden eşleştirir. Güncellenen satırlarda dosyadaki fiyat ve kurallar uygulanır. Boş fiyat alanı mağaza fiyatına döner. Dosyada açıkça yayına kapatılan ürün veya varyant katalogdan kaldırılır. Shopify’a yeni eklenen ürünler eşleşmiyorsa `npm run sync` ile mağaza kaydını güncelleyin, yeni kaydı dağıtın ve CSV’yi tekrar yayımlayın. Özel depoda eşleştirilmiş yayın verisi tutulur.
 
 Yerel testte Blob yerine `WHOLESALE_LOCAL_FILE` ile `public` dışında bir mutlak dosya yolu seçin. Aynı değişkenle yerel sunucuyu başlatıp ana katalog sayfasını açın.

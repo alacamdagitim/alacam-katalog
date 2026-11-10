@@ -283,16 +283,38 @@
       <label class="wholesale-admin-field">Shopify katalog CSV dosyası
         <input id="wholesale-admin-file" type="file" accept=".csv,text/csv" required>
       </label>
+      <fieldset class="wholesale-admin-mode" id="wholesale-admin-mode">
+        <legend>Yükleme biçimi</legend>
+        <label>
+          <input type="radio" name="wholesale-mode" value="merge" aria-labelledby="wholesale-admin-merge-label" aria-describedby="wholesale-admin-merge-help" required>
+          <span><strong id="wholesale-admin-merge-label">Mevcut kataloğu güncelle</strong>
+            <small id="wholesale-admin-merge-help">CSV’de bulunmayan varyantlar katalogda kalır.</small></span>
+        </label>
+        <label>
+          <input type="radio" name="wholesale-mode" value="replace" aria-labelledby="wholesale-admin-replace-label" aria-describedby="wholesale-admin-replace-help" required>
+          <span><strong id="wholesale-admin-replace-label">Sıfırdan oluştur</strong>
+            <small id="wholesale-admin-replace-help">Katalogda yalnızca CSV’deki görünür varyantlar yer alır.</small></span>
+        </label>
+      </fieldset>
       <label class="wholesale-admin-field" id="wholesale-admin-catalog-field" hidden>Katalog
         <select id="wholesale-admin-catalog"></select>
       </label>
       <section class="wholesale-admin-summary" id="wholesale-admin-summary" aria-labelledby="wholesale-admin-summary-title" hidden>
         <h3 id="wholesale-admin-summary-title"></h3>
         <p id="wholesale-admin-summary-date"></p>
+        <p id="wholesale-admin-summary-mode"></p>
+        <h4>Son katalog</h4>
         <dl>
           <div><dt>Görünür</dt><dd id="wholesale-admin-visible"></dd></div>
           <div><dt>Gizli</dt><dd id="wholesale-admin-hidden"></dd></div>
-          <div><dt>Eşleşmeyen</dt><dd id="wholesale-admin-unmatched"></dd></div>
+          <div><dt>Dosyada eşleşmeyen</dt><dd id="wholesale-admin-unmatched"></dd></div>
+        </dl>
+        <h4>Varyant değişiklikleri</h4>
+        <dl class="wholesale-admin-impact">
+          <div><dt>Eklenen</dt><dd id="wholesale-admin-added"></dd></div>
+          <div><dt>Güncellenen</dt><dd id="wholesale-admin-updated"></dd></div>
+          <div><dt>Korunan</dt><dd id="wholesale-admin-preserved"></dd></div>
+          <div><dt>Kaldırılan</dt><dd id="wholesale-admin-removed"></dd></div>
         </dl>
       </section>
       <p class="wholesale-admin-status" id="wholesale-admin-status" role="status"></p>

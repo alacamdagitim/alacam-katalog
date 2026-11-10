@@ -53,12 +53,30 @@
   color: var(--ink);
   cursor: pointer;
 }
+.wholesale-admin-mode { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.wholesale-admin-mode legend { margin-bottom: 5px; padding: 0; font-size: 13px; font-weight: 550; }
+.wholesale-admin-mode label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--field-radius);
+  cursor: pointer;
+}
+.wholesale-admin-mode label:has(:checked) { border-color: var(--accent-border); background: var(--accent-pale); }
+.wholesale-admin-mode input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: #806015; }
+.wholesale-admin-mode strong { display: block; font-size: 13px; font-weight: 600; }
+.wholesale-admin-mode small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
 .wholesale-admin-summary { padding: 11px 12px; border-radius: var(--field-radius); background: var(--surface); }
 .wholesale-admin-summary h3 { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.wholesale-admin-summary p { margin: 3px 0 8px; color: var(--muted); font-size: 12px; }
+.wholesale-admin-summary p { margin: 3px 0; color: var(--muted); font-size: 12px; }
+.wholesale-admin-summary h4 { margin: 9px 0 4px; font-size: 12px; font-weight: 600; }
 .wholesale-admin-summary dl { display: grid; gap: 4px; margin: 0; font-size: 13px; }
 .wholesale-admin-summary dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 9px; }
 .wholesale-admin-summary dd { margin: 0; font-weight: 550; }
+.wholesale-admin-summary .wholesale-admin-impact { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
 .wholesale-admin-status { margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .wholesale-admin-status:empty { margin-block-end: -12px; }
 .wholesale-admin-status.is-error { color: var(--sale); }

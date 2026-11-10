@@ -1,0 +1,9 @@
+{
+  "name": "alacam-dijital-katalog",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.cjs",
+    "sync": "node scripts/sync.cjs"
+  }
+}

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f5f6fa">
+  <meta name="description" content="Alaçam Dağıtım ürünlerini, paket ve koli seçeneklerini tek katalogda inceleyin.">
+  <title>Ürün Kataloğu | Alaçam Dağıtım</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/catalog.js"></script>
+</head>
+<body>
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.5a4 4 0 0 0 5.7.2l4-4a4 4 0 0 0-5.7-5.7l-2.2 2.2m2.2 4.3a4 4 0 0 0-5.7-.2l-4 4a4 4 0 0 0 5.7 5.7l2.2-2.2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z M4.3 7.7 12 12l7.7-4.3M12 12v9M8 5.25l8 4.5"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 7h4m4 0h8M4 17h8m4 0h4"/><circle cx="10" cy="7" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 5v14m5-14v14"/></symbol>
+    <symbol id="i-view-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.5M4 12h.5M4 18h.5"/></symbol>
+    <symbol id="i-view-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.2"/><rect x="14" y="4" width="6" height="6" rx="1.2"/><rect x="4" y="14" width="6" height="6" rx="1.2"/><rect x="14" y="14" width="6" height="6" rx="1.2"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v2"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="m8 9 4-4 4 4m-8 6 4 4 4-4"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M13 5h6v6m0-6-9 9m-2-9H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M4 12h16m-4-4 4 4-4 4M8 8l-4 4 4 4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-.7 12a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1L6 7m4 4v5m4-5v5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-basket" viewBox="0 0 24 24"><path d="m7 9 3-5m7 5-3-5M3 9h18l-2.1 9.5A2 2 0 0 1 17 20H7a2 2 0 0 1-1.9-1.5L3 9Zm6 4 .5 3.5M15 13l-.5 3.5"/></symbol>
+  </svg>
+  <header class="topbar">
+    <div id="toolbar-dismiss" class="toolbar-dismiss" aria-hidden="true"></div>
+    <div class="shell masthead">
+      <div class="topbar-inner">
+        <div class="brand-group">
+          <a class="brand" href="/" aria-label="Alaçam Dağıtım katalog ana sayfası">
+            <img src="/assets/alacam-logo.png" alt="Alaçam Dağıtım" width="174" height="39">
+          </a>
+          <h1 id="catalog-title">Ürün kataloğu</h1>
+        </div>
+        <ul class="catalog-totals" aria-label="Katalog özeti">
+          <li><strong id="product-total">—</strong><span>ürün</span></li>
+          <li><strong id="type-total">—</strong><span>tür</span></li>
+          <li><strong id="brand-total">—</strong><span>marka</span></li>
+        </ul>
+      </div>
+      <div class="header-actions">
+        <button class="button share" id="share" type="button" aria-label="Bağlantıyı kopyala">
+          <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
+        </button>
+        <label class="view-select select-wrap glass-surface">
+          <span class="sr-only">Görünüm</span>
+          <select class="catalog-select" id="catalog-view" aria-controls="table-scroll card-scroll">
+            <button type="button"><selectedcontent></selectedcontent></button>
+            <option value="list">Liste</option>
+            <option value="grid">Kartlar</option>
+          </select>
+          <svg class="icon view-list-icon" aria-hidden="true"><use href="#i-view-list"/></svg>
+          <svg class="icon view-grid-icon" aria-hidden="true"><use href="#i-view-grid"/></svg>
+          <svg class="icon view-caret" aria-hidden="true"><use href="#i-down"/></svg>
+        </label>
+        <button class="button request-open glass-surface" id="request-open" type="button" aria-controls="request-dialog" aria-haspopup="dialog">
+          <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg><span class="request-label">Sepet</span><span id="request-count" hidden></span>
+        </button>
+      </div>
+      <div class="filter-row" role="search" aria-label="Katalog filtreleri">
+        <button class="button search-toggle" id="search-toggle" type="button" aria-label="Ara" aria-controls="catalog-search-box" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+        </button>
+        <div class="search-box glass-surface" id="catalog-search-box">
+          <label class="search-icon" for="search" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg></label>
+          <input id="search" type="search" aria-label="Ürün adı, kod veya barkod ara" placeholder="Ürün, kod, barkod" autocomplete="off" enterkeyhint="search">
+          <button class="search-clear" id="search-clear" type="button" aria-label="Aramayı temizle" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+          <kbd aria-hidden="true">/</kbd>
+          <button class="button search-done" id="search-done" type="button" aria-label="Aramayı kapat">Bitti</button>
+        </div>
+        <div class="filter-controls glass-surface" role="group" aria-label="Ürün filtreleri">
+          <div class="multi-picker" id="type-picker"></div>
+          <div class="multi-picker" id="brand-picker"></div>
+          <div class="multi-picker" id="tags-picker"></div>
+          <button class="button advanced-toggle" id="advanced" type="button" aria-label="Detaylı filtreler" aria-controls="advanced-panel" aria-expanded="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-filter"/></svg><span>Filtreler</span><span class="filter-badge" id="advanced-count" hidden></span>
+          </button>
+        </div>
+        <div class="results-tools glass-surface" role="group" aria-label="Sonuç seçenekleri">
+          <label class="select-wrap sort-wrap">
+            <span class="sr-only">Sıralama</span>
+            <select class="catalog-select" id="sort"><button type="button"><selectedcontent></selectedcontent></button><option value="featured">Öne çıkanlar</option><option value="name:asc">Ürün adı A–Z</option><option value="name:desc">Ürün adı Z–A</option><option value="price:asc">Fiyat artan</option><option value="price:desc">Fiyat azalan</option></select>
+            <svg class="icon sort-caret" aria-hidden="true"><use href="#i-down"/></svg>
+            <svg class="icon sort-glyph" aria-hidden="true"><use href="#i-sort"/></svg>
+          </label>
+          <details class="column-picker">
+            <summary class="button" aria-label="Sütunlar"><svg class="icon" aria-hidden="true"><use href="#i-columns"/></svg><span>Sütunlar</span></summary>
+            <div class="catalog-menu column-panel" role="group" aria-labelledby="column-panel-title">
+              <header class="catalog-menu-heading">
+                <h2 id="column-panel-title">Sütunlar</h2>
+                <button class="button icon-button catalog-menu-close" id="columns-done" type="button" aria-label="Sütunları kapat">
+                  <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+                </button>
+              </header>
+              <div class="column-panel-body">
+                <div class="column-panel-tools">
+                  <p class="column-order-hint" id="column-order-help">Tutamacı sürükleyerek sıralayın.<span class="sr-only"> Klavyeyle yukarı ve aşağı okları kullanabilirsiniz.</span></p>
+                  <button class="text-button" id="columns-reset" type="button" hidden>Varsayılan sıra</button>
+                </div>
+                <fieldset class="catalog-menu-options" id="column-options"><legend class="sr-only">Görünen sütunlar</legend></fieldset>
+              </div>
+              <div class="sr-only" id="column-order-status" role="status"></div>
+            </div>
+          </details>
+        </div>
+        <div class="catalog-menu advanced-panel" id="advanced-panel" role="group" aria-labelledby="advanced-title" hidden>
+          <header class="catalog-menu-heading">
+            <h2 id="advanced-title">Detaylı filtreler</h2>
+            <button class="button icon-button catalog-menu-close" id="advanced-close" type="button" aria-label="Detaylı filtreleri kapat">
+              <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+            </button>
+          </header>
+          <div class="advanced-panel-body">
+            <div class="advanced-group" role="group" aria-labelledby="advanced-price-title">
+              <h3 id="advanced-price-title">Fiyat aralığı</h3>
+              <div class="advanced-fields">
+                <label>En düşük fiyat<span class="sr-only"> (₺)</span>
+                  <span class="advanced-control">
+                    <input id="min-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
+                    <span class="advanced-unit" aria-hidden="true">₺</span>
+                  </span>
+                </label>
+                <label>En yüksek fiyat<span class="sr-only"> (₺)</span>
+                  <span class="advanced-control">
+                    <input id="max-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Sınırsız">
+                    <span class="advanced-unit" aria-hidden="true">₺</span>
+                  </span>
+                </label>
+              </div>
+              <p class="filter-error" id="filter-error" role="status" hidden>En düşük fiyat, en yüksek fiyattan büyük.</p>
+            </div>
+            <div class="advanced-group" role="group" aria-labelledby="advanced-stock-title">
+              <h3 id="advanced-stock-title">Stok ve koli</h3>
+              <div class="advanced-fields">
+                <label>Stok durumu
+                  <span class="advanced-control advanced-select">
+                    <select class="catalog-select" id="stock"><option value="">Tümü</option><option value="in">Stokta</option><option value="out">Tükendi</option><option value="unknown">Belirtilmemiş</option></select>
+                    <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg>
+                  </span>
+                </label>
+                <label>Koli seçeneği
+                  <span class="advanced-control advanced-select">
+                    <select class="catalog-select" id="case-only"><option value="">Tümü</option><option value="yes">Koli satışı var</option><option value="no">Belirtilmemiş</option></select>
+                    <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg>
+                  </span>
+                </label>
+              </div>
+              <label>En az koli içi miktar
+                <span class="advanced-control">
+                  <input id="min-case" type="number" min="1" step="1" inputmode="numeric" placeholder="Sınır yok">
+                  <span class="advanced-unit" aria-hidden="true">adet</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="filter-summary" class="filter-summary" hidden>
+        <div class="active-filters" id="active-filters" aria-label="Seçili filtreler" hidden></div>
+        <button class="text-button" id="reset" type="button">Temizle<span class="sr-only"> (tüm filtreleri)</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="catalog-main">
+    <section class="catalog" aria-labelledby="catalog-title">
+      <p id="result-count" class="sr-only" role="status"></p>
+      <p class="sr-only" id="column-resize-help">Sürükleyin veya sol ve sağ ok tuşlarını kullanın. Çift tıklayarak varsayılan genişliğe dönün.</p>
+      <div class="table-scroll" id="table-scroll" tabindex="0" role="region" aria-label="Kaydırılabilir ürün tablosu">
+        <table id="table">
+          <colgroup id="table-columns"></colgroup>
+          <thead><tr id="table-head"></tr></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="card-scroll" id="card-scroll" role="region" aria-label="Ürün kartları" tabindex="0" hidden>
+        <ul class="product-grid" id="card-grid"></ul>
+      </div>
+      <div class="empty shell" id="empty">
+        <h3 id="empty-title">Katalog yükleniyor</h3>
+        <p id="empty-description" hidden></p>
+        <button class="button" id="empty-action" type="button" hidden></button>
+      </div>
+      <div class="pagination shell" id="pagination" hidden>
+        <div class="mobile-hint" hidden><svg class="icon" aria-hidden="true"><use href="#i-scroll"/></svg> Yana kaydırın</div>
+        <div class="page-actions">
+          <label class="select-wrap page-size">
+            <span class="sr-only">Sayfa başına ürün</span>
+            <select class="catalog-select" id="page-size">
+              <option value="20" selected>20 / sayfa</option>
+              <option value="40">40 / sayfa</option>
+              <option value="60">60 / sayfa</option>
+            </select>
+            <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg>
+          </label>
+          <button class="button icon-button" id="previous" type="button" aria-label="Önceki sayfa"><svg class="icon" aria-hidden="true"><use href="#i-left"/></svg></button>
+          <span class="page-label" id="page-label"></span>
+          <button class="button icon-button" id="next" type="button" aria-label="Sonraki sayfa"><svg class="icon" aria-hidden="true"><use href="#i-right"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <p class="sync shell" id="sync" role="status" hidden></p>
+  </main>
+
+  <dialog class="product-dialog" id="product-dialog" aria-labelledby="detail-title">
+    <div class="dialog-heading product-dialog-heading">
+      <span class="section-kicker">ÜRÜN DETAYI</span>
+      <form method="dialog"><button type="submit" class="button icon-button" aria-label="Kapat"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form>
+    </div>
+    <div id="product-detail"></div>
+  </dialog>
+  <dialog class="card-options-dialog" id="card-options-dialog" aria-labelledby="card-options-title">
+    <header class="card-options-heading">
+      <h2 id="card-options-title"></h2>
+      <form method="dialog">
+        <button class="button icon-button card-options-close" type="submit" aria-label="Kapat">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
+      </form>
+    </header>
+    <div class="card-options-fields" id="card-options-fields"></div>
+    <footer class="card-options-footer">
+      <p class="card-options-price" id="card-options-price" aria-live="polite"></p>
+      <form method="dialog"><button class="button button-accent" id="card-options-done" type="submit">Tamam</button></form>
+    </footer>
+  </dialog>
+  <dialog class="request-dialog" id="request-dialog" aria-labelledby="request-title">
+    <header class="request-heading">
+      <h2 id="request-title">Sepet</h2>
+      <form method="dialog"><button type="submit" class="button request-close" aria-label="Kapat"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form>
+    </header>
+    <div class="request-body">
+      <div class="request-empty" id="request-empty">
+        <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg>
+        <p>Sepetiniz boş.</p>
+        <span>Katalogdan ürün ekleyebilirsiniz.</span>
+      </div>
+      <ul class="request-items" id="request-items"></ul>
+      <label class="request-note">
+        <span class="request-note-label">Talep notu <span>İsteğe bağlı</span></span>
+        <textarea id="request-note" rows="3" maxlength="500" placeholder="Teslimat tarihi veya teklif için eklemek istediğiniz bilgiler"></textarea>
+      </label>
+    </div>
+    <footer class="request-footer">
+      <div class="request-actions">
+        <button class="button request-copy" id="request-copy" type="button"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Talebi kopyala</button>
+        <a class="button button-accent" id="request-send" target="_blank" rel="noopener noreferrer">WhatsApp’ta aç <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+      </div>
+      <p id="request-status" class="request-status" role="status"></p>
+    </footer>
+  </dialog>
+  <div class="toast" id="toast" aria-hidden="true" hidden><span class="toast-icon" id="toast-icon"></span><span id="toast-message"></span></div>
+  <div class="sr-only" id="toast-announcement" role="status"></div>
+  <noscript>Ürün kataloğunu kullanmak için tarayıcınızda JavaScript’i etkinleştirin.</noscript>
+</body>
+</html>

@@ -3,6 +3,7 @@ import { initColumnReorder } from './column-reorder.js';
 import { initColumnWidths } from './column-widths.js';
 import { initBackdropDismiss } from './dialog-dismiss.js';
 import { applyWholesale, salePrice, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
+import { catalogCategories, renderCategoryCards } from './category-menu.js';
 
 const get = (id) => document.getElementById(id);
 const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -53,8 +54,19 @@ const cardGrid = get('card-grid');
 const cardOptionsDialog = get('card-options-dialog');
 const cardOptionsFields = get('card-options-fields');
 const viewControl = get('catalog-view');
+const categoryMenu = get('category-menu');
+const categoryGrid = get('category-grid');
+const categorySearch = get('category-search');
+const categoryAll = get('category-all');
+const categoryResults = get('category-results-nav');
+const categoryTitle = get('category-results-title');
+const productResults = tableScroll.closest('.catalog');
 let catalogView = 'list';
 let cardOptionsHandle = null;
+let browsingCategories = true;
+let categories = [];
+let lastCategory = '';
+let categoryScrollTop = 0;
 
 try {
   if (localStorage.getItem(viewStorageKey) === 'grid') catalogView = 'grid';
@@ -688,6 +700,16 @@ function renderChips(filters) {
 }
 
 function render(focusChoice) {
+  const showCategories = browsingCategories && categories.length > 0;
+  categoryMenu.hidden = !showCategories;
+  productResults.hidden = showCategories;
+  document.body.classList.toggle('is-category-menu', showCategories || (!catalog && state === 'loading'));
+  if (showCategories) return;
+
+  categoryResults.hidden = !categories.length;
+  const types = pickers.type.selection;
+  categoryTitle.textContent = types.size === 1 ? types.values().next().value
+    : types.size ? 'Seçili türler' : 'Tüm ürünler';
   const filters = getFilters();
   get('search-clear').hidden = !filters.search;
   const hasSearch = Boolean(filters.search.trim());
@@ -776,14 +798,52 @@ function resetPage() {
   render();
 }
 
-function resetFilters() {
+function clearFilters() {
   for (const [id, value] of Object.entries(defaults)) get(id).value = value;
   for (const { selection, update } of Object.values(pickers)) {
     selection.clear();
     update();
   }
+}
+
+function resetFilters() {
+  clearFilters();
   resetPage();
   openSearch();
+}
+
+function categoryButton(type) {
+  return type ? categoryGrid.querySelector(`[data-category="${CSS.escape(type)}"]`) : categoryAll;
+}
+
+function refreshCategoryGrid() {
+  const focusedType = categoryGrid.contains(document.activeElement) && document.activeElement.dataset.category;
+  const count = renderCategoryCards(categoryGrid, categories, categorySearch.value);
+  get('category-empty').hidden = Boolean(count);
+  if (focusedType) (categoryButton(focusedType) ?? categoryAll).focus({ preventScroll: true });
+}
+
+function openCategory(type = '') {
+  lastCategory = type;
+  categoryScrollTop = categoryMenu.scrollTop;
+  browsingCategories = false;
+  clearFilters();
+  if (type) {
+    pickers.type.selection.add(type);
+    pickers.type.update();
+  }
+  page = 1;
+  render();
+  activeCatalogScroll().scrollTop = 0;
+  categoryTitle.focus({ preventScroll: true });
+}
+
+function returnToCategories() {
+  browsingCategories = true;
+  clearFilters();
+  render();
+  categoryMenu.scrollTop = categoryScrollTop;
+  (categoryButton(lastCategory) ?? categoryAll).focus({ preventScroll: true });
 }
 
 function displayCatalog(data, source) {
@@ -804,6 +864,11 @@ function displayCatalog(data, source) {
   pickers.type.setOptions(data.types);
   pickers.brand.setOptions(data.brands);
   pickers.tags.setOptions(data.tags ?? []);
+  const nextCategories = catalogCategories(data.rows);
+  if (JSON.stringify(nextCategories) !== JSON.stringify(categories)) {
+    categories = nextCategories;
+    refreshCategoryGrid();
+  }
   setStatus(source);
   render();
 }
@@ -1556,6 +1621,13 @@ compactSearch.addEventListener('change', () => {
 });
 
 for (const id of filterIds) get(id).addEventListener('input', resetPage);
+categorySearch.addEventListener('input', refreshCategoryGrid);
+categoryGrid.addEventListener('click', ({ target }) => {
+  const button = target.closest('button[data-category]');
+  if (button) openCategory(button.dataset.category);
+});
+categoryAll.addEventListener('click', () => openCategory());
+get('category-back').addEventListener('click', returnToCategories);
 get('search-clear').addEventListener('click', () => {
   searchInput.value = '';
   resetPage();
@@ -1812,7 +1884,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey
     && !event.target.closest('input, select, textarea, [contenteditable], dialog')) {
     event.preventDefault();
-    openSearch();
+    if (categoryMenu.hidden) openSearch();
+    else categorySearch.focus();
   }
   if (event.key === 'Escape') {
     if (!advancedPanel.hidden && !event.target.closest('dialog')) closeAdvanced(true);

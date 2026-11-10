@@ -10,10 +10,11 @@
   <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/wholesale-admin.css">
+  <link rel="stylesheet" href="/category-menu.css">
   <script type="module" src="/catalog.js"></script>
   <script type="module" src="/wholesale-admin.js"></script>
 </head>
-<body>
+<body class="is-category-menu">
   <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.5a4 4 0 0 0 5.7.2l4-4a4 4 0 0 0-5.7-5.7l-2.2 2.2m2.2 4.3a4 4 0 0 0-5.7-.2l-4 4a4 4 0 0 0 5.7 5.7l2.2-2.2"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4 4"/></symbol>
@@ -184,10 +185,37 @@
   </header>
 
   <main class="catalog-main">
+    <section class="category-menu" id="category-menu" aria-labelledby="category-menu-title" tabindex="0" hidden>
+      <div class="shell category-menu-shell">
+        <div class="category-menu-hero">
+          <h2 id="category-menu-title">Kataloglarımız</h2>
+          <div class="category-menu-tools">
+            <label class="category-search">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+              <span class="sr-only">Kategori ara</span>
+              <input type="search" id="category-search" placeholder="Kategori ara" autocomplete="off" enterkeyhint="search">
+            </label>
+            <button class="button button-accent category-all" id="category-all" type="button">
+              Tüm ürünler<svg class="icon" aria-hidden="true"><use href="#i-right"/></svg>
+            </button>
+          </div>
+        </div>
+        <ul class="category-grid" id="category-grid"></ul>
+        <p class="category-empty" id="category-empty" role="status" hidden>Aramanıza uygun kategori bulunamadı.</p>
+      </div>
+    </section>
     <section class="catalog" aria-labelledby="catalog-title">
+      <nav class="category-results-nav" id="category-results-nav" aria-label="Kategori gezinme" hidden>
+        <div class="shell category-results-inner">
+          <button class="category-back" id="category-back" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-left"/></svg>Kategoriler
+          </button>
+          <h2 id="category-results-title" tabindex="-1"></h2>
+        </div>
+      </nav>
       <p id="result-count" class="sr-only" role="status"></p>
       <p class="sr-only" id="column-resize-help">Sürükleyin veya sol ve sağ ok tuşlarını kullanın. Çift tıklayarak varsayılan genişliğe dönün.</p>
-      <div class="table-scroll" id="table-scroll" tabindex="0" role="region" aria-label="Kaydırılabilir ürün tablosu">
+      <div class="table-scroll" id="table-scroll" tabindex="0" role="region" aria-label="Kaydırılabilir ürün tablosu" hidden>
         <table id="table">
           <colgroup id="table-columns"></colgroup>
           <thead><tr id="table-head"></tr></thead>

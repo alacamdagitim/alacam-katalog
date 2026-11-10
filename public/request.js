@@ -1,5 +1,5 @@
 import { initBackdropDismiss } from './dialog-dismiss.js';
-import { salePrice, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
+import { salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 
 const STORAGE_KEY = 'alacam-katalog-talep-v1';
 const NOTE_STORAGE_KEY = 'alacam-katalog-talep-notu-v1';
@@ -41,6 +41,18 @@ export function requestAvailability(row, variant) {
   return requestStock(row, variant) === 'out' ? 'out' : null;
 }
 
+export function requestOrder(row, variant) {
+  const id = String(variant?.id ?? row.id);
+  const current = offersById.get(id) ?? { row, variant };
+  const rule = wholesaleRule(current.row, current.variant);
+  return {
+    rule,
+    price: salePrice(current.row, current.variant),
+    quantity: items.find((item) => item.id === id)?.quantity,
+    ...wholesaleLimits(rule),
+  };
+}
+
 function lineState(item) {
   const current = offersById.get(item.id);
   const { row, variant } = current ?? {};
@@ -55,20 +67,6 @@ function lineState(item) {
     unitCents,
     subtotal: unitCents == null ? null : BigInt(unitCents) * BigInt(item.quantity),
   };
-}
-
-function validQuantity(quantity, { minimum, increment, maximum }) {
-  return isQuantity(quantity) && quantity >= minimum && quantity <= maximum
-    && (quantity - minimum) % increment === 0;
-}
-
-function stepQuantity(quantity, { minimum, increment, maximum }, direction) {
-  if (quantity < minimum) return direction > 0 ? minimum : null;
-  if (quantity > maximum) return direction < 0 ? maximum : null;
-  const offset = (quantity - minimum) / increment;
-  const step = direction > 0 ? Math.floor(offset) + 1 : Math.ceil(offset) - 1;
-  const next = minimum + step * increment;
-  return next >= minimum && next <= maximum ? next : null;
 }
 
 function requestTotal(states) {
@@ -205,7 +203,7 @@ function render() {
           ${description ? `<span class="request-item-option" title="${escapeHtml(description)}">${escapeHtml(description)}</span>` : ''}
           <span class="request-item-stock stock out" ${message ? '' : 'hidden'}>${message}</span>
           <span class="request-item-price" ${price ? '' : 'hidden'}>${price}</span>
-          <div class="request-quantity">
+          <div class="request-quantity quantity-stepper">
             <button type="button" data-quantity-step="-1" aria-label="${label} miktarını azalt" aria-disabled="${disabled || stepQuantity(item.quantity, state, -1) == null}">
               <svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg>
             </button>
@@ -248,16 +246,13 @@ function updateQuantity(item, input, quantity) {
   updateActions();
 }
 
-export function addToRequest(row, variant) {
+export function setRequestQuantity(row, variant, quantity) {
   if (row?.id == null || !row.name) return false;
   const selected = variant ?? row.variants?.find((option) => String(option.id) === String(row.id));
   if (requestAvailability(row, selected)) return false;
   const id = String(selected?.id ?? row.id);
   const existing = items.find((item) => item.id === id);
-  const current = offersById.get(id) ?? { row, variant: selected };
-  const limits = wholesaleLimits(wholesaleRule(current.row, current.variant));
-  const quantity = existing ? stepQuantity(existing.quantity, limits, 1) : limits.minimum;
-  if (quantity == null) return false;
+  if (!validQuantity(quantity, requestOrder(row, selected))) return false;
 
   const primary = id === String(row.id);
   let option = selected?.label;
@@ -423,6 +418,7 @@ export function initRequest() {
     if (event.key === STORAGE_KEY || event.key === null) {
       items = readItems();
       render();
+      ui.open.dispatchEvent(new Event('request:changed'));
     } else if (noteChanged) {
       updateActions();
     }

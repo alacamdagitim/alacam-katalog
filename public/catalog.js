@@ -1,8 +1,8 @@
-import { initRequest, addToRequest, hydrateRequest, requestCount, requestStock, requestAvailability } from './request.js';
+import { initRequest, setRequestQuantity, hydrateRequest, requestCount, requestStock, requestAvailability, requestOrder } from './request.js';
 import { initColumnReorder } from './column-reorder.js';
 import { initColumnWidths } from './column-widths.js';
 import { initBackdropDismiss } from './dialog-dismiss.js';
-import { applyWholesale, salePrice, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
+import { applyWholesale, salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 import { catalogCategories, renderCategoryCards } from './category-menu.js';
 
 const get = (id) => document.getElementById(id);
@@ -1038,12 +1038,9 @@ function productPrice(row, variant) {
 const isCaseOption = (variant) => variant?.label?.startsWith('1 koli');
 const caseOption = (row) => row.variants?.find(isCaseOption);
 
-function renderProductAttributes(row, variant) {
+function renderProductAttributes(row, variant, price, rule) {
   const primary = !variant || String(variant.id) === String(row.id);
   const selectedCase = isCaseOption(variant);
-  const price = productPrice(row, variant);
-  const rule = wholesaleRule(row, variant);
-  const limits = wholesaleLimits(rule);
   const compareAt = variant?.compareAtPrice ?? (primary ? row.compareAtPrice : null);
   const compare = price != null && compareAt > price ? money(compareAt) : '';
   const barcode = variant?.barcode ?? (primary ? row.barcode : null);
@@ -1062,16 +1059,6 @@ function renderProductAttributes(row, variant) {
   ];
   get('detail-attributes').innerHTML = attributes.filter(([, value]) => value != null)
     .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('');
-  const rules = get('detail-wholesale');
-  const order = [
-    rule?.minimum && `En az ${formatNumber(limits.minimum)}`,
-    rule?.increment > 1 && `Artış adımı ${formatNumber(limits.increment)}`,
-    rule?.maximum && `En çok ${formatNumber(limits.maximum)}`,
-  ].filter(Boolean);
-  rules.hidden = !order.length && !rule?.tiers?.length;
-  rules.innerHTML = `${order.length ? `<p>Sipariş miktarı (satış birimi) · ${order.join(' · ')}</p>` : ''}
-    ${rule?.tiers?.length ? `<dl class="detail-price-tiers" aria-label="Miktara göre satış birimi fiyatı">${rule.tiers.map(({ quantity, price: tierPrice }) =>
-      `<div><dt>${formatNumber(quantity)} ve üzeri</dt><dd>${wholesaleMoney(Math.round(tierPrice * 100))} / birim</dd></div>`).join('')}</dl>` : ''}`;
 }
 
 const installmentQuotes = new Map();
@@ -1117,7 +1104,7 @@ function renderInstallmentPlans(container, { amount, programs }) {
         <select class="catalog-select">${programs.map(({ name }, index) => `<option value="${index}">${escape(name)}</option>`).join('')}</select>
         ${icon('down')}
       </label>
-      <p>Hesaplanan tutar ${money(amount / 100)}</p>
+      <p>Hesaplanan birim tutarı ${money(amount / 100)}</p>
     </div>
     <table class="installments-table" aria-label="Taksit planı">
       <thead><tr><th scope="col">Taksit</th><th scope="col">Aylık ödeme</th><th scope="col">Toplam</th></tr></thead>
@@ -1247,7 +1234,25 @@ function showProduct(row, family = [row], variantId) {
         <div class="select-wrap detail-select"><select class="catalog-select" id="detail-variant">${saleOptions(offer, selected)}</select>${icon('down')}</div>
       </div>` : ''}
       <dl class="detail-grid" id="detail-attributes"></dl>
-      <div class="detail-wholesale" id="detail-wholesale" hidden></div>
+      <div class="detail-order">
+        <div class="detail-order-row">
+          <label for="detail-quantity">Sipariş miktarı <small>Satış birimi</small></label>
+          <div class="quantity-stepper">
+            <button type="button" data-step="-1" aria-label="Miktarı azalt">${icon('minus')}</button>
+            <input type="number" id="detail-quantity" inputmode="numeric" aria-describedby="detail-quantity-rules" aria-errormessage="detail-quantity-error">
+            <button type="button" data-step="1" aria-label="Miktarı artır">${icon('plus')}</button>
+          </div>
+        </div>
+        <dl class="detail-quantity-rules" id="detail-quantity-rules" hidden></dl>
+        <p class="detail-error" id="detail-quantity-error" hidden>Geçerli bir sipariş miktarı girin.</p>
+        <table class="detail-price-tiers" id="detail-price-tiers" aria-label="Miktara göre fiyat" hidden>
+          <thead><tr><th scope="col">Satış birimi</th><th scope="col">Birim fiyatı</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="detail-order-total" id="detail-order-total" hidden>
+          <span>Ara toplam</span><output for="detail-quantity"></output>
+        </div>
+      </div>
       <div class="detail-actions">
         <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Sepeti aç</button>
         <button class="button button-accent" id="detail-add" type="button">Sepete ekle</button>
@@ -1270,7 +1275,6 @@ function showProduct(row, family = [row], variantId) {
         <div id="installments-options"></div>
       </div>
     </section>`;
-  renderProductAttributes(offer, selected);
   const dialog = get('product-dialog');
   const tabs = [...dialog.querySelectorAll('[role="tab"]')];
   const installmentTab = get('installments-tab');
@@ -1278,6 +1282,14 @@ function showProduct(row, family = [row], variantId) {
   const installmentOptions = get('installments-options');
   const detailStatus = get('detail-status');
   const detailError = get('detail-error');
+  const quantityInput = get('detail-quantity');
+  const quantityButtons = [...quantityInput.parentElement.querySelectorAll('[data-step]')];
+  const quantityRules = get('detail-quantity-rules');
+  const quantityError = get('detail-quantity-error');
+  const tierTable = get('detail-price-tiers');
+  const tierBody = tierTable.tBodies[0];
+  const totalRow = get('detail-order-total');
+  const totalAmount = totalRow.querySelector('output');
   const addButton = get('detail-add');
   const openRequest = get('detail-open-request');
   const offerSelect = get('detail-offer');
@@ -1290,8 +1302,13 @@ function showProduct(row, family = [row], variantId) {
   let galleryLead = selected?.image || offer.image;
   let installmentRequest;
   let installmentAmount;
+  let installmentUnit;
+  let order;
 
-  const currentInstallmentAmount = () => Math.round(productPrice(offer, selected) * 100);
+  const readQuantity = () => /^\d+$/.test(quantityInput.value) ? quantityInput.valueAsNumber : NaN;
+  const nextQuantity = (button, quantity = readQuantity()) => stepQuantity(
+    Number.isSafeInteger(quantity) ? quantity : order.minimum - 1, order, Number(button.dataset.step),
+  );
 
   function cancelInstallments() {
     installmentRequest?.controller.abort();
@@ -1309,7 +1326,7 @@ function showProduct(row, family = [row], variantId) {
   }
 
   async function loadInstallments(retry = false) {
-    const amount = currentInstallmentAmount();
+    const amount = installmentUnit;
     const saved = installmentQuotes.get(amount);
     const store = installmentOptions.querySelector('[data-installment-store]');
     if (!retry && Object.is(amount, installmentAmount)
@@ -1388,19 +1405,70 @@ function showProduct(row, family = [row], variantId) {
     });
   }
 
-  function showRequestAction(added) {
+  function syncQuantity() {
     const unavailable = requestAvailability(offer, selected);
-    const wasSoldOut = addButton.disabled;
-    openRequest.hidden = !added || Boolean(unavailable);
+    const quantity = readQuantity();
+    const valid = validQuantity(quantity, order);
+    const unitCents = wholesaleUnitCents(order.rule, order.price, valid ? quantity : order.minimum);
+    installmentUnit = valid ? unitCents : null;
+    renderProductAttributes(offer, selected, unitCents == null ? null : unitCents / 100, order.rule);
+    quantityInput.disabled = Boolean(unavailable);
+    quantityInput.setAttribute('aria-invalid', String(!valid && !unavailable));
+    quantityError.hidden = valid || Boolean(unavailable) || quantityInput.value === '';
+    for (const button of quantityButtons) {
+      button.setAttribute('aria-disabled', String(Boolean(unavailable) || nextQuantity(button, quantity) == null));
+    }
+    const activeTier = valid ? order.rule?.tiers?.findLastIndex((tier) => tier.quantity <= quantity) : -1;
+    for (const [index, row] of [...tierBody.rows].entries()) {
+      if (index === activeTier) row.setAttribute('aria-current', 'true');
+      else row.removeAttribute('aria-current');
+    }
+    totalRow.hidden = !order.rule || !valid || unitCents == null || Boolean(unavailable);
+    totalAmount.textContent = totalRow.hidden ? '' : wholesaleMoney(BigInt(unitCents) * BigInt(quantity));
+    openRequest.hidden = Boolean(unavailable) || !valid || quantity !== order.quantity;
     addButton.hidden = !openRequest.hidden;
-    addButton.disabled = Boolean(unavailable);
-    addButton.textContent = unavailable === 'out' ? 'Tükendi' : unavailable ? 'Katalog dışı' : 'Sepete ekle';
-    if (unavailable) detailStatus.textContent = unavailable === 'out' ? 'Seçilen seçenek tükendi.' : 'Seçilen seçenek katalogdan kaldırıldı.';
-    else if (wasSoldOut) detailStatus.textContent = '';
+    addButton.disabled = Boolean(unavailable) || !valid;
+    addButton.toggleAttribute('data-unavailable', Boolean(unavailable));
+    addButton.textContent = unavailable === 'out' ? 'Tükendi' : unavailable ? 'Katalog dışı'
+      : order.quantity ? 'Sepeti güncelle' : 'Sepete ekle';
+  }
+
+  function updateOrder(reset = false) {
+    const previous = order;
+    order = requestOrder(offer, selected);
+    const { rule, minimum, increment, maximum } = order;
+    const quantity = readQuantity();
+    quantityInput.min = minimum;
+    quantityInput.step = increment;
+    quantityInput.max = maximum;
+    const previousDefault = previous && (validQuantity(previous.quantity, previous) ? previous.quantity : previous.minimum);
+    if (reset || (quantity === previousDefault && document.activeElement !== quantityInput)) {
+      quantityInput.value = validQuantity(order.quantity, order) ? order.quantity : minimum;
+    }
+    const rules = [
+      rule?.minimum && ['En az', formatNumber(minimum)],
+      rule?.increment && ['Artış adımı', `+${formatNumber(increment)}`],
+      rule?.maximum && ['En çok', formatNumber(maximum)],
+    ].filter(Boolean);
+    quantityRules.hidden = !rules.length;
+    quantityRules.innerHTML = rules.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('');
+    const tiers = rule?.tiers ?? [];
+    tierTable.hidden = !tiers.length;
+    tierBody.innerHTML = tiers.map(({ quantity: threshold, price }) =>
+      `<tr><td>${formatNumber(threshold)}+</td><td>${wholesaleMoney(Math.round(price * 100))}</td></tr>`).join('');
+    syncQuantity();
+  }
+
+  function refreshInstallments() {
+    if (installmentTab.getAttribute('aria-selected') === 'true') loadInstallments();
+    else if (installmentRequest && !Object.is(installmentAmount, installmentUnit)) {
+      cancelInstallments();
+      installmentAmount = undefined;
+    }
   }
 
   function updateSelection() {
-    renderProductAttributes(offer, selected);
+    updateOrder(true);
     const image = selected?.image || offer.image;
     if (image !== galleryLead) {
       galleryLead = image;
@@ -1410,12 +1478,7 @@ function showProduct(row, family = [row], variantId) {
     shop.href = productLink(offer, selected?.id);
     detailStatus.textContent = '';
     detailError.hidden = true;
-    showRequestAction(false);
-    if (installmentTab.getAttribute('aria-selected') === 'true') loadInstallments();
-    else if (installmentRequest && !Object.is(installmentAmount, currentInstallmentAmount())) {
-      cancelInstallments();
-      installmentAmount = undefined;
-    }
+    refreshInstallments();
   }
 
   function updatePackageControl() {
@@ -1464,20 +1527,38 @@ function showProduct(row, family = [row], variantId) {
     selected = next;
     updateSelection();
   });
+  quantityInput.addEventListener('input', () => {
+    detailError.hidden = true;
+    syncQuantity();
+  });
+  quantityInput.addEventListener('change', () => {
+    const quantity = readQuantity();
+    if (validQuantity(quantity, order)) quantityInput.value = quantity;
+    refreshInstallments();
+  });
+  for (const button of quantityButtons) {
+    button.addEventListener('click', () => {
+      if (button.getAttribute('aria-disabled') === 'true') return;
+      const next = nextQuantity(button);
+      if (next == null) return;
+      quantityInput.value = next;
+      detailError.hidden = true;
+      syncQuantity();
+      refreshInstallments();
+    });
+  }
   addButton.addEventListener('click', () => {
     const option = selected && { ...selected, label: saleOptionLabel(offer, selected) };
-    const added = addToRequest(offer, option);
-    if (!added) {
-      showRequestAction(false);
+    const updating = Boolean(order.quantity);
+    const saved = setRequestQuantity(offer, option, readQuantity());
+    updateOrder();
+    if (!saved) {
       detailError.hidden = addButton.disabled;
       return;
     }
     detailError.hidden = true;
-    detailStatus.textContent = `Sepete eklendi. Toplam miktar ${number.format(requestCount())}.`;
-    if (openRequest.hidden) {
-      showRequestAction(true);
-      openRequest.focus({ preventScroll: true });
-    }
+    detailStatus.textContent = `${updating ? 'Sepet güncellendi.' : 'Sepete eklendi.'} Toplam miktar ${number.format(requestCount())}.`;
+    openRequest.focus({ preventScroll: true });
   });
   openRequest.addEventListener('click', () => {
     dialog.close();
@@ -1485,8 +1566,8 @@ function showProduct(row, family = [row], variantId) {
   });
   const refreshStock = () => {
     if (!dialog.open) return;
-    renderProductAttributes(offer, selected);
-    showRequestAction(!openRequest.hidden);
+    updateOrder();
+    refreshInstallments();
   };
   refreshOpenProductStock = refreshStock;
   dialog.addEventListener('close', () => {
@@ -1494,7 +1575,7 @@ function showProduct(row, family = [row], variantId) {
     if (refreshOpenProductStock === refreshStock) refreshOpenProductStock = undefined;
   }, { once: true });
   updatePackageControl();
-  showRequestAction(false);
+  updateOrder(true);
   dialog.showModal();
   dialog.scrollTop = 0;
   detail.scrollTop = 0;
@@ -1908,5 +1989,6 @@ get('share').addEventListener('click', async () => {
 });
 
 initRequest();
+get('request-open').addEventListener('request:changed', () => refreshOpenProductStock?.());
 window.addEventListener('wholesale:published', load);
 load();

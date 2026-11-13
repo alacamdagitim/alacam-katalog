@@ -16,6 +16,10 @@ function initWholesaleAdmin() {
   const doneButton = get('done');
   const summary = get('summary');
   const status = get('status');
+  const resetToggle = get('reset-toggle');
+  const resetPanel = get('reset-panel');
+  const resetWord = get('reset-word');
+  const resetStatus = get('reset-status');
   const number = new Intl.NumberFormat('tr-TR');
   const date = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Istanbul' });
   let busy = false;
@@ -35,6 +39,8 @@ function initWholesaleAdmin() {
     previewButton.hidden = published;
     publishButton.hidden = !previewToken || published;
     doneButton.hidden = !published;
+    doneButton.disabled = busy;
+    resetToggle.disabled = resetWord.disabled = busy;
   }
 
   function setCatalogs(titles = [], selected = '') {
@@ -49,6 +55,58 @@ function initWholesaleAdmin() {
     summary.hidden = true;
     setStatus('');
     updateControls();
+  }
+
+  function closeReset() {
+    resetPanel.hidden = true;
+    resetToggle.setAttribute('aria-expanded', 'false');
+    resetWord.value = '';
+    resetWord.setCustomValidity('');
+  }
+
+  async function resetCatalog() {
+    if (busy) return;
+    if (resetWord.value !== 'sapanca') {
+      resetWord.setCustomValidity('Sıfırlamak için sapanca yazıp Enter’a basın.');
+      resetWord.reportValidity();
+      return;
+    }
+    busy = true;
+    updateControls();
+    resetStatus.classList.remove('is-error');
+    resetStatus.textContent = 'Toptan katalog sıfırlanıyor…';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch('/api/wholesale', {
+        method: 'DELETE',
+        headers: { 'X-Catalog-Confirmation': resetWord.value },
+        signal: controller.signal,
+        redirect: 'error',
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        resetStatus.classList.add('is-error');
+        resetStatus.textContent = result?.error || 'Katalog sıfırlanamadı. Tekrar deneyin.';
+        return;
+      }
+      if (result?.reset !== true || result.active !== false) throw new Error('Unexpected reset response');
+      published = false;
+      form.reset();
+      setCatalogs();
+      clearPreview();
+      closeReset();
+      resetStatus.textContent = 'Toptan katalog sıfırlandı. Mağaza ürünleri ve fiyatları gösteriliyor.';
+      window.dispatchEvent(new CustomEvent('wholesale:published'));
+    } catch {
+      resetStatus.classList.add('is-error');
+      resetStatus.textContent = 'Sıfırlama onayı alınamadı. Tekrar deneyin.';
+    } finally {
+      clearTimeout(timeout);
+      busy = false;
+      updateControls();
+      (resetPanel.hidden ? resetToggle : resetWord).focus();
+    }
   }
 
   function showSummary(result, mode) {
@@ -140,6 +198,8 @@ function initWholesaleAdmin() {
     form.reset();
     setCatalogs();
     clearPreview();
+    closeReset();
+    resetStatus.textContent = '';
   });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -154,4 +214,18 @@ function initWholesaleAdmin() {
   catalog.addEventListener('change', clearPreview);
   publishButton.addEventListener('click', () => submit(true));
   doneButton.addEventListener('click', () => dialog.close());
+  resetToggle.addEventListener('click', () => {
+    if (!resetPanel.hidden) return closeReset();
+    resetStatus.textContent = '';
+    resetPanel.hidden = false;
+    resetToggle.setAttribute('aria-expanded', 'true');
+    resetWord.focus();
+  });
+  resetWord.addEventListener('input', () => resetWord.setCustomValidity(''));
+  resetWord.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    resetCatalog();
+  });
 }

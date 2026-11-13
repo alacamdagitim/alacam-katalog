@@ -376,6 +376,21 @@
         <button class="button button-accent" id="wholesale-admin-done" type="button" hidden>Tamam</button>
       </div>
     </form>
+    <section class="wholesale-admin-reset">
+      <button class="text-button wholesale-reset-toggle" id="wholesale-admin-reset-toggle" type="button"
+        aria-expanded="false" aria-controls="wholesale-admin-reset-panel">
+        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Yüklenen kataloğu sıfırla
+      </button>
+      <div id="wholesale-admin-reset-panel" hidden>
+        <p>Yüklenen toptan fiyatlar ve kurallar kaldırılır. Katalog mağaza ürünlerine ve fiyatlarına döner.</p>
+        <label class="wholesale-admin-field" for="wholesale-admin-reset-word">Onay kelimesi
+          <input id="wholesale-admin-reset-word" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+            enterkeyhint="go" aria-describedby="wholesale-admin-reset-help" placeholder="sapanca">
+        </label>
+        <p id="wholesale-admin-reset-help"><strong>sapanca</strong> yazıp Enter’a basın.</p>
+      </div>
+      <p class="wholesale-admin-status" id="wholesale-admin-reset-status" role="status"></p>
+    </section>
   </dialog>
   <div class="toast" id="toast" aria-hidden="true" hidden><span class="toast-icon" id="toast-icon"></span><span id="toast-message"></span></div>
   <div class="sr-only" id="toast-announcement" role="status"></div>

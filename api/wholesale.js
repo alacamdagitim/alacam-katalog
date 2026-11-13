@@ -1,5 +1,5 @@
 const { createHash } = require('node:crypto');
-const { matchWholesaleCatalog, readWholesale, readWholesaleSnapshot, wholesaleStorage, writeWholesale, WholesaleWriteConflict } = require('../lib/wholesale.cjs');
+const { matchWholesaleCatalog, readWholesale, readWholesaleSnapshot, wholesaleStorage, writeWholesale, resetWholesale, WholesaleWriteConflict } = require('../lib/wholesale.cjs');
 
 const maxUploadBytes = 3_500_000;
 const storageError = 'Toptan katalog deposuna şu anda erişilemiyor.';
@@ -69,14 +69,35 @@ module.exports = async (request, response) => {
       return send(503, { error: storageError });
     }
   }
-  if (request.method !== 'POST') {
-    response.setHeader('Allow', 'GET, HEAD, POST');
+  if (request.method !== 'POST' && request.method !== 'DELETE') {
+    response.setHeader('Allow', 'GET, HEAD, POST, DELETE');
     return send(405, { error: 'Bu istek yöntemi desteklenmiyor.' });
   }
 
   const fetchSite = request.headers['sec-fetch-site'];
   if (fetchSite && fetchSite !== 'same-origin') {
     return send(403, { error: 'Dosyayı katalog sayfasından yükleyin.' });
+  }
+
+  if (request.method === 'DELETE') {
+    if (request.headers['x-catalog-confirmation'] !== 'sapanca') {
+      return send(403, { error: 'Kataloğu sıfırlamak için doğrulama metnini tam olarak yazın.' });
+    }
+    try {
+      const storage = wholesaleStorage();
+      if (!storage) return send(503, { error: storageError });
+      const { revision } = await readWholesaleSnapshot(storage);
+      await resetWholesale(storage, revision);
+      return send(200, { reset: true, active: false });
+    } catch (error) {
+      if (error instanceof WholesaleWriteConflict) {
+        return send(409, {
+          code: 'reset_conflict',
+          error: 'Katalog bu sırada değişti. Sıfırlamak için Enter tuşuna yeniden basın.',
+        });
+      }
+      return send(503, { error: storageError });
+    }
   }
 
   const params = new URL(request.url, 'http://localhost').searchParams;

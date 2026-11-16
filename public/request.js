@@ -3,7 +3,10 @@ import { salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney
 
 const STORAGE_KEY = 'alacam-katalog-talep-v1';
 const NOTE_STORAGE_KEY = 'alacam-katalog-talep-notu-v1';
-const WHATSAPP_URL = 'https://wa.me/905301480040';
+const PENDING_KEY = 'alacam-katalog-bekleyen-talep-v1';
+let pendingRequest = null;
+let submitting = false;
+let submissionMessage = '';
 const MAX_STORED_QUANTITY = 2147483647;
 const formatQuantity = new Intl.NumberFormat('tr-TR');
 const IMAGE_HOSTS = new Set(['alacamdagitim.com', 'cdn.shopify.com']);
@@ -166,22 +169,24 @@ function updateActions() {
   const total = enabled ? requestTotal(states) : null;
   ui.count.textContent = formatQuantity.format(count);
   ui.count.hidden = count === 0;
-  ui.empty.hidden = items.length > 0;
+  ui.empty.hidden = items.length > 0 || !ui.result.hidden;
+  ui.form.hidden = !items.length && !pendingRequest;
+  ui.dialog.dataset.empty = String(!items.length && !pendingRequest);
   ui.copy.disabled = !enabled;
-  ui.send.setAttribute('aria-disabled', String(!enabled));
+  ui.send.disabled = submitting || (!pendingRequest && !enabled);
+  ui.send.setAttribute('aria-disabled', String(ui.send.disabled));
+  ui.send.textContent = submitting ? 'Gönderiliyor…' : pendingRequest ? 'Talep durumunu kontrol et' : 'Talep oluştur';
+  ui.fields.disabled = submitting || Boolean(pendingRequest);
+  ui.dialog.dataset.submitting = String(submitting || Boolean(pendingRequest));
+  for (const control of ui.list.querySelectorAll('input, button')) {
+    if (submitting || pendingRequest) control.disabled = true;
+  }
   ui.total.hidden = total == null;
   ui.totalAmount.textContent = total == null ? '' : wholesaleMoney(total);
-  ui.status.textContent = blocked ? 'Devam etmek için işaretli ürünleri veya miktarları kontrol edin.'
-    : !catalogReady && items.length ? 'Katalog ve sepet fiyatları doğrulanıyor…' : '';
+  ui.status.textContent = submissionMessage || (blocked ? 'Devam etmek için işaretli ürünleri veya miktarları kontrol edin.'
+    : !catalogReady && items.length ? 'Katalog ve talep fiyatları doğrulanıyor…' : '');
   ui.preview.hidden = true;
-  if (enabled) {
-    const url = new URL(WHATSAPP_URL);
-    url.searchParams.set('text', requestText(states));
-    ui.send.href = url.href;
-  } else {
-    ui.send.removeAttribute('href');
-  }
-  if (ui.note) ui.note.disabled = !items.length;
+  if (ui.note) ui.note.disabled = !items.length || submitting || Boolean(pendingRequest);
 }
 
 function render() {
@@ -214,7 +219,7 @@ function render() {
             </button>
           </div>
         </div>
-        <button class="request-remove" type="button" title="Sepetten kaldır" aria-label="${label} ürününü sepetten kaldır">
+        <button class="request-remove" type="button" title="Talepten kaldır" aria-label="${label} ürününü talepten kaldır">
           <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
         </button>
       </li>`;
@@ -239,7 +244,7 @@ function syncQuantityControls(item, input) {
 
 function updateQuantity(item, input, quantity) {
   const state = lineState(item);
-  if (state.unavailable || !validQuantity(quantity, state)) return;
+  if (submitting || pendingRequest || state.unavailable || !validQuantity(quantity, state)) return;
   item.quantity = quantity;
   syncQuantityControls(item, input);
   saveItems();
@@ -247,7 +252,9 @@ function updateQuantity(item, input, quantity) {
 }
 
 export function setRequestQuantity(row, variant, quantity) {
-  if (row?.id == null || !row.name) return false;
+  if (submitting || pendingRequest || row?.id == null || !row.name) return false;
+  submissionMessage = '';
+  if (ui) ui.result.hidden = true;
   const selected = variant ?? row.variants?.find((option) => String(option.id) === String(row.id));
   if (requestAvailability(row, selected)) return false;
   const id = String(selected?.id ?? row.id);
@@ -326,6 +333,8 @@ export function initRequest() {
     status: get('request-status'),
     total: get('request-total'),
     totalAmount: get('request-total-amount'),
+    form: get('request-contact'), fields: get('request-fields'), result: get('request-result'),
+    company: get('request-company'), name: get('request-name'), email: get('request-email'), phone: get('request-phone'),
     preview: document.createElement('textarea'),
   };
   ui.preview.className = 'request-copy-preview';
@@ -335,6 +344,15 @@ export function initRequest() {
   ui.status.after(ui.preview);
   items = readItems();
   if (ui.note) ui.note.value = readNote();
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null');
+    if (saved?.requestId && Array.isArray(saved.items) && saved.contact) {
+      pendingRequest = saved;
+      for (const key of ['company', 'name', 'email', 'phone']) ui[key].value = saved.contact[key] ?? '';
+      ui.note.value = saved.note;
+      submissionMessage = 'Önceki talebinizin durumunu kontrol edin. Talep kodu: ' + saved.requestId;
+    }
+  } catch { /* Session persistence may be unavailable. */ }
   render();
 
   ui.open.addEventListener('click', () => {
@@ -369,6 +387,7 @@ export function initRequest() {
   ui.list.addEventListener('change', finishQuantityEdit);
   ui.list.addEventListener('focusout', finishQuantityEdit);
   ui.list.addEventListener('click', (event) => {
+    if (submitting || pendingRequest) return;
     const button = event.target.closest('.request-remove, [data-quantity-step]');
     if (!button) return;
     const row = button.closest('[data-request-item]');
@@ -392,11 +411,69 @@ export function initRequest() {
     (nextRow?.querySelector('.request-remove') ?? ui.dialog.querySelector('.request-close'))?.focus();
   });
   ui.note?.addEventListener('input', () => {
+    submissionMessage = '';
     saveValue(NOTE_STORAGE_KEY, ui.note.value.slice(0, ui.note.maxLength));
     updateActions();
   });
-  ui.send.addEventListener('click', (event) => {
-    if (ui.send.getAttribute('aria-disabled') === 'true') event.preventDefault();
+  ui.form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (submitting || ui.send.disabled) return;
+    if (!pendingRequest && !ui.form.reportValidity()) return;
+    if (!pendingRequest) {
+      pendingRequest = {
+        requestId: crypto.randomUUID(),
+        contact: Object.fromEntries(['company', 'name', 'email', 'phone'].map(key => [key, ui[key].value.trim()])),
+        note: ui.note.value.trim(),
+        items: items.map(item => ({ id: item.id, quantity: item.quantity, unitCents: lineState(item).unitCents })),
+      };
+      // Persist before sending: a reload must reuse the same request ID.
+      try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(pendingRequest)); }
+      catch {
+        pendingRequest = null;
+        submissionMessage = 'Talep göndermek için bu sekmede tarayıcı depolamasına izin verin.';
+        updateActions(); return;
+      }
+    }
+    const sent = pendingRequest;
+    submitting = true;
+    submissionMessage = 'Fiyatlar ve koli adetleri kontrol ediliyor, talebiniz gönderiliyor…';
+    updateActions();
+    try {
+      const response = await fetch('/api/draft-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sent), signal: AbortSignal.timeout(100000),
+      });
+      const result = await response.json();
+      if (response.ok && result.created === true && typeof result.name === 'string' && result.requestId === sent.requestId) {
+        // Keep any other products added in another tab while this request was sent.
+        items = readItems().flatMap(item => {
+          const submitted = sent.items.find(line => line.id === item.id);
+          const quantity = item.quantity - (submitted?.quantity ?? 0);
+          return quantity > 0 ? [{ ...item, quantity }] : [];
+        });
+        saveItems();
+        if (ui.note.value.trim() === sent.note) { ui.note.value = ''; saveValue(NOTE_STORAGE_KEY, ''); }
+        pendingRequest = null;
+        sessionStorage.removeItem(PENDING_KEY);
+        submissionMessage = '';
+        ui.result.innerHTML = `<strong>Talebiniz alındı · ${escapeHtml(result.name)}</strong><p>Sipariş talebiniz ekibimize iletildi. İletişim bilgileriniz üzerinden size dönüş yapacağız.</p>`;
+        ui.result.hidden = false;
+        ui.result.tabIndex = -1;
+        ui.result.focus({ preventScroll: true });
+        ui.open.dispatchEvent(new Event('request:changed'));
+      } else {
+        submissionMessage = typeof result.error === 'string' ? result.error : 'Talebin durumu doğrulanamadı.';
+        if (result.safeToEdit === true) {
+          pendingRequest = null; sessionStorage.removeItem(PENDING_KEY);
+          if (['price_changed', 'quantity_changed', 'catalog_changed', 'unavailable'].includes(result.code)) window.dispatchEvent(new Event('catalog:refresh'));
+        } else submissionMessage += ' Talep kodu: ' + sent.requestId;
+      }
+    } catch {
+      submissionMessage = 'Bağlantı kesildi. Aynı talebi yeniden oluşturmadan durumunu kontrol edin. Talep kodu: ' + sent.requestId;
+    } finally {
+      submitting = false;
+      render();
+    }
   });
   ui.copy.addEventListener('click', async () => {
     if (ui.copy.disabled) return;

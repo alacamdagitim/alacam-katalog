@@ -1301,8 +1301,8 @@ function showProduct(row, family = [row], variantId) {
         </div>
       </div>
       <div class="detail-actions">
-        <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Sepeti aç</button>
-        <button class="button button-accent" id="detail-add" type="button">Sepete ekle</button>
+        <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Talebi aç</button>
+        <button class="button button-accent" id="detail-add" type="button">Talebe ekle</button>
         <a class="button" id="detail-shop" href="${productLink(offer, selected?.id)}" target="_blank" rel="noopener noreferrer">Mağazada gör ${icon('external')}</a>
       </div>
       <p class="sr-only" id="detail-status" role="status"></p>
@@ -1477,7 +1477,7 @@ function showProduct(row, family = [row], variantId) {
     addButton.disabled = Boolean(unavailable) || !valid;
     addButton.toggleAttribute('data-unavailable', Boolean(unavailable));
     addButton.textContent = unavailable === 'out' ? 'Tükendi' : unavailable ? 'Katalog dışı'
-      : order.quantity ? 'Sepeti güncelle' : 'Sepete ekle';
+      : order.quantity ? 'Talebi güncelle' : 'Talebe ekle';
   }
 
   function updateOrder(reset = false) {
@@ -1604,7 +1604,7 @@ function showProduct(row, family = [row], variantId) {
       return;
     }
     detailError.hidden = true;
-    detailStatus.textContent = `${updating ? 'Sepet güncellendi.' : 'Sepete eklendi.'} Toplam miktar ${number.format(requestCount())}.`;
+    detailStatus.textContent = `${updating ? 'Talep güncellendi.' : 'Talebe eklendi.'} Toplam miktar ${number.format(requestCount())}.`;
     openRequest.focus({ preventScroll: true });
   });
   openRequest.addEventListener('click', () => {
@@ -2071,4 +2071,5 @@ get('share').addEventListener('click', async () => {
 initRequest();
 get('request-open').addEventListener('request:changed', () => refreshOpenProductStock?.());
 
+window.addEventListener('catalog:refresh', () => load());
 load();

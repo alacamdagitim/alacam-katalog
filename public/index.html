@@ -70,7 +70,7 @@
           <svg class="icon view-caret" aria-hidden="true"><use href="#i-down"/></svg>
         </label>
         <button class="button request-open glass-surface" id="request-open" type="button" aria-controls="request-dialog" aria-haspopup="dialog">
-          <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg><span class="request-label">Sepet</span><span id="request-count" hidden></span>
+          <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg><span class="request-label">Sipariş talebi</span><span id="request-count" hidden></span>
         </button>
       </div>
       <div class="category-menu-tools" id="category-menu-tools" role="search" aria-label="Ürün türleri" hidden>
@@ -294,26 +294,37 @@
   </dialog>
   <dialog class="request-dialog" id="request-dialog" aria-labelledby="request-title">
     <header class="request-heading">
-      <h2 id="request-title">Sepet</h2>
+      <h2 id="request-title">Sipariş talebi</h2>
       <form method="dialog"><button type="submit" class="button request-close" aria-label="Kapat"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form>
     </header>
     <div class="request-body">
+      <div class="request-result" id="request-result" role="status" hidden></div>
       <div class="request-empty" id="request-empty">
         <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg>
-        <p>Sepetiniz boş.</p>
+        <p>Talebinizde ürün yok.</p>
         <span>Katalogdan ürün ekleyebilirsiniz.</span>
       </div>
       <ul class="request-items" id="request-items"></ul>
+      <form id="request-contact" class="request-contact">
+        <p class="request-intro">Ürünlerinizi ve iletişim bilgilerinizi iletin. Ekibimiz sipariş talebiniz için sizinle iletişime geçsin.</p>
+        <fieldset id="request-fields">
+          <label>Firma adı<input id="request-company" name="organization" autocomplete="organization" maxlength="160" required></label>
+          <label>Ad soyad<input id="request-name" name="name" autocomplete="name" maxlength="120" required></label>
+          <label>E-posta<input id="request-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label><span>Telefon <span class="request-optional">İsteğe bağlı</span></span><input id="request-phone" name="tel" type="tel" autocomplete="tel" maxlength="40"></label>
+        </fieldset>
       <label class="request-note">
         <span class="request-note-label">Talep notu <span>İsteğe bağlı</span></span>
         <textarea id="request-note" rows="3" maxlength="500" placeholder="Teslimat tarihi veya teklif için eklemek istediğiniz bilgiler"></textarea>
       </label>
+      </form>
     </div>
     <footer class="request-footer">
-      <p class="request-total" id="request-total" hidden><span>Katalog toplamı</span><strong id="request-total-amount"></strong></p>
+      <p class="request-total" id="request-total" hidden><span>Ürün toplamı</span><strong id="request-total-amount"></strong></p>
+      <p class="request-intro">Talebiniz incelemeye alınır. Teslimat ve ödeme detayları ekibimizle netleştirilir.</p>
       <div class="request-actions">
         <button class="button request-copy" id="request-copy" type="button"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Talebi kopyala</button>
-        <a class="button button-accent" id="request-send" target="_blank" rel="noopener noreferrer">WhatsApp’ta aç <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <button class="button button-accent" id="request-send" type="submit" form="request-contact">Talep oluştur</button>
       </div>
       <p id="request-status" class="request-status" role="status"></p>
     </footer>

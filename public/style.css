@@ -1710,7 +1710,18 @@ body:has(.request-dialog[open]) { overflow: hidden; }
 }
 .request-empty .icon { width: 30px; height: 30px; margin-bottom: 5px; }
 .request-empty p { margin: 0; color: var(--ink); font-weight: 600; }
-.request-empty:not([hidden]) ~ .request-note { display: none; }
+.request-empty:not([hidden]) ~ .request-contact { display: none; }
+.request-contact { margin-top: 22px; }
+.request-intro { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+.request-contact fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.request-contact fieldset label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.request-contact input { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; font-size: 16px; font-weight: 400; }
+.request-optional { color: var(--muted); font-size: 11px; font-weight: 400; }
+.request-result { margin-top: 20px; padding: 18px; border: 1px solid #b8d9c4; border-radius: 14px; background: #f0faf3; color: #205a35; line-height: 1.6; overflow-wrap: anywhere; }
+.request-result strong { display: block; }
+.request-result p { margin: 6px 0 0; font-size: 13px; }
+.request-dialog[data-submitting="true"] .request-items { pointer-events: none; opacity: .65; }
+@media (max-width: 380px) { .request-contact fieldset { grid-template-columns: minmax(0, 1fr); } }
 .request-items { margin: 0; padding: 0; list-style: none; }
 .request-item {
   display: grid;
@@ -1812,7 +1823,8 @@ body:has(.request-dialog[open]) { overflow: hidden; }
 .request-status { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 .request-status:empty { display: none; }
 .request-copy-preview { min-height: 90px; margin-top: 8px; }
-.request-dialog:has(.request-empty:not([hidden])) .request-footer { display: none; }
+.request-dialog[data-empty="true"] .request-footer { display: none; }
+.request-dialog[data-submitting="true"] .request-footer { display: block; }
 @media (max-width: 520px) {
   .request-dialog { --request-padding: 16px; --request-control-size: 44px; width: 100%; border: 0; border-radius: 0; }
   .request-heading { padding-block: max(12px, env(safe-area-inset-top)) 12px; }

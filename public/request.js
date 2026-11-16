@@ -150,7 +150,7 @@ function updateActions() {
   ui.dialog.dataset.empty = String(!items.length && !pendingRequest);
   ui.send.disabled = submitting || Boolean(pendingRequest) || !enabled;
   ui.send.setAttribute('aria-disabled', String(ui.send.disabled));
-  ui.send.textContent = submitting ? 'Gönderiliyor…' : 'Talep oluştur';
+  ui.send.textContent = submitting ? 'Gönderiliyor…' : 'Talep Gönder';
   ui.fields.disabled = submitting || Boolean(pendingRequest);
   ui.dialog.dataset.submitting = String(submitting || Boolean(pendingRequest));
   for (const control of ui.list.querySelectorAll('input, button')) {
@@ -193,7 +193,7 @@ function render() {
             </button>
           </div>
         </div>
-        <button class="request-remove" type="button" title="Talepten kaldır" aria-label="${label} ürününü talepten kaldır">
+        <button class="request-remove" type="button" title="Sepetten kaldır" aria-label="${label} ürününü sepetten kaldır">
           <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
         </button>
       </li>`;
@@ -306,7 +306,7 @@ export function initRequest() {
     total: get('request-total'),
     totalAmount: get('request-total-amount'),
     form: get('request-contact'), fields: get('request-fields'), result: get('request-result'),
-    company: get('request-company'), name: get('request-name'), email: get('request-email'), phone: get('request-phone'), website: get('request-website'),
+    company: get('request-company'), name: get('request-name'), surname: get('request-surname'), email: get('request-email'), phone: get('request-phone'), website: get('request-website'),
   };
   items = readItems();
   if (ui.note) ui.note.value = readNote();
@@ -315,6 +315,8 @@ export function initRequest() {
     if (saved?.requestId && Array.isArray(saved.items) && saved.contact) {
       pendingRequest = saved;
       for (const key of ['company', 'name', 'email', 'phone']) ui[key].value = saved.contact[key] ?? '';
+      ui.name.value = saved.contact.firstName ?? saved.contact.name ?? '';
+      ui.surname.value = saved.contact.lastName ?? '';
       ui.note.value = saved.note;
       submissionMessage = 'Talebiniz gönderiliyor…';
     }
@@ -397,7 +399,9 @@ export function initRequest() {
     if (!pendingRequest) {
       pendingRequest = {
         requestId: crypto.randomUUID(),
-        contact: Object.fromEntries(['company', 'name', 'email', 'phone'].map(key => [key, ui[key].value.trim()])),
+        contact: { ...Object.fromEntries(['company', 'email', 'phone'].map(key => [key, ui[key].value.trim()])),
+          firstName: ui.name.value.trim(), lastName: ui.surname.value.trim(),
+          name: [ui.name.value.trim(), ui.surname.value.trim()].join(' '), },
         note: ui.note.value.trim(),
         website: ui.website.value,
         items: items.map(item => ({ id: item.id, quantity: item.quantity, unitCents: lineState(item).unitCents })),
@@ -426,7 +430,7 @@ export function initRequest() {
         saveItems();
         if (ui.note.value.trim() === sent.note) { ui.note.value = ''; saveValue(NOTE_STORAGE_KEY, ''); }
         pendingRequest = null;
-        sessionStorage.removeItem(PENDING_KEY);
+        try { sessionStorage.removeItem(PENDING_KEY); } catch { /* Receipt remains valid if storage becomes unavailable. */ }
         submissionMessage = '';
         ui.website.value = '';
         ui.result.innerHTML = `<strong>${result.duplicate ? 'Bu talep zaten alındı' : 'Talebiniz alındı'} · ${escapeHtml(result.name)}</strong><p>${result.duplicate

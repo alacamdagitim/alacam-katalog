@@ -226,3 +226,9 @@
   .category-card:hover .category-card-arrow { color: #765607; }
   .category-back:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
+
+/* The featured categories support both touch swipes and desktop controls. */
+.category-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.category-scroll-controls { display: flex; gap: 6px; flex: none; margin-bottom: 12px; }
+.category-featured { display: flex; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding: 2px 2px 12px; scroll-padding-inline: 2px; }
+.category-featured .category-tile { flex: 0 0 clamp(220px, 30vw, 340px); scroll-snap-align: start; }

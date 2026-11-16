@@ -271,3 +271,13 @@ test('2000 forged new IDs with rotating IP/email values cannot flood Shopify or 
   assert.equal(writes, 15); assert.equal(reads, 15);
   assert.equal(records.records.size, 31);
 });
+
+test('separate given/family names are validated and saved together without breaking legacy submissions', () => {
+  const body = request(); body.contact.firstName = 'Ayşe Nur'; body.contact.lastName = 'Yılmaz'; body.contact.name = 'ignored';
+  const normalized = normalizeRequest(body);
+  assert.equal(normalized.contact.name, 'Ayşe Nur Yılmaz');
+  assert.match(draftInput(normalized, offers()).note, /Yetkili: Ayşe Nur Yılmaz/);
+  body.contact.lastName = '';
+  assert.throws(() => normalizeRequest(body), { code: 'invalid_request' });
+  assert.equal(normalizeRequest(request()).contact.name, 'Test Yetkili');
+});

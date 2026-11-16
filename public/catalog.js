@@ -829,7 +829,23 @@ function categoryButton(type) {
   return button?.closest('[hidden]') ? null : button;
 }
 
+function updateCategoryScroll() {
+  const maximum = categoryFeatured.scrollWidth - categoryFeatured.clientWidth;
+  get('category-scroll-controls').hidden = categoryFeatured.hidden || maximum <= 1;
+  get('category-scroll-prev').disabled = categoryFeatured.scrollLeft <= 1;
+  get('category-scroll-next').disabled = categoryFeatured.scrollLeft >= maximum - 1;
+}
+for (const [id, direction] of [['category-scroll-prev', -1], ['category-scroll-next', 1]]) {
+  get(id).addEventListener('click', () => categoryFeatured.scrollBy({
+    left: direction * categoryFeatured.clientWidth * .8,
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  }));
+}
+categoryFeatured.addEventListener('scroll', updateCategoryScroll, { passive: true });
+new ResizeObserver(updateCategoryScroll).observe(categoryFeatured);
+
 function filterCategories() {
+  requestAnimationFrame(updateCategoryScroll);
   const query = fold(categorySearch.value).trim();
   const words = query ? query.split(/\s+/) : [];
   let count = 0;
@@ -1298,8 +1314,8 @@ function showProduct(row, family = [row], variantId) {
         </div>
       </div>
       <div class="detail-actions">
-        <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Talebi aç</button>
-        <button class="button button-accent" id="detail-add" type="button">Talebe ekle</button>
+        <button class="button button-accent" id="detail-open-request" type="button" aria-haspopup="dialog" aria-controls="request-dialog" hidden>${icon('check')} Sepeti aç</button>
+        <button class="button button-accent" id="detail-add" type="button">Sepete ekle</button>
         <a class="button" id="detail-shop" href="${productLink(offer, selected?.id)}" target="_blank" rel="noopener noreferrer">Mağazada gör ${icon('external')}</a>
       </div>
       <p class="sr-only" id="detail-status" role="status"></p>
@@ -1474,7 +1490,7 @@ function showProduct(row, family = [row], variantId) {
     addButton.disabled = Boolean(unavailable) || !valid;
     addButton.toggleAttribute('data-unavailable', Boolean(unavailable));
     addButton.textContent = unavailable === 'out' ? 'Tükendi' : unavailable ? 'Katalog dışı'
-      : order.quantity ? 'Talebi güncelle' : 'Talebe ekle';
+      : order.quantity ? 'Sepeti güncelle' : 'Sepete ekle';
   }
 
   function updateOrder(reset = false) {
@@ -1601,7 +1617,7 @@ function showProduct(row, family = [row], variantId) {
       return;
     }
     detailError.hidden = true;
-    detailStatus.textContent = `${updating ? 'Talep güncellendi.' : 'Talebe eklendi.'} Toplam miktar ${number.format(requestCount())}.`;
+    detailStatus.textContent = `${updating ? 'Sepet güncellendi.' : 'Sepete eklendi.'} Toplam miktar ${number.format(requestCount())}.`;
     openRequest.focus({ preventScroll: true });
   });
   openRequest.addEventListener('click', () => {

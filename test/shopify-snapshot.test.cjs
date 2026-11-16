@@ -30,7 +30,7 @@ test('all prices and rules come from the exact catalog; base product price is ig
   const data = snapshot(); const row = data.rows[0];
   assert.equal(row.price, 395); assert.equal(row.compareAtPrice, 439); assert.equal(row.wholesale.minimum, 6);
   assert.equal(row.wholesale.increment, 6); assert.equal(row.wholesale.tiers[0].price, 393);
-  assert.equal(row.barcode, '123456789'); assert.equal(data.productCount, 1);
+  assert.equal(row.barcode, '123456789'); assert.equal(row.sku, 'FO10'); assert.equal(data.productCount, 1);
   assert.equal(data.source, 'shopify'); assert.equal(data.schemaVersion, 3);
   assert.throws(() => buildCatalog(info, [rawProduct], [], rules), { code: 'catalog_invalid' });
   assert.throws(() => buildCatalog(info, [rawProduct], prices, []), { code: 'catalog_invalid' });

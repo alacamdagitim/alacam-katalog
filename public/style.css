@@ -1890,3 +1890,5 @@ body:has(.request-dialog[open]) { overflow: hidden; }
 @media (orientation: landscape) and (max-height: 500px) and (min-width: 560px) and (max-width: 740px) {
   #product-detail { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
 }
+
+#request-fields > label:first-child { grid-column: 1 / -1; }

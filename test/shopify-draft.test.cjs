@@ -106,9 +106,9 @@ test('HTTP endpoint blocks foreign origins, writes through GET, oversized input 
 test('live verification requests only selected variant prices and checks selected publication, quantities and availability', async () => {
   const page = nodes => ({ nodes, pageInfo: { hasNextPage: false, endCursor: null } });
   const client = { query: async (doc, vars) => {
-    if (doc.includes('WholesaleCatalog(')) return { catalogs: { nodes: [{ id: 'gid://shopify/MarketCatalog/123', title: 'Toptan Katalog', status: 'ACTIVE', publication: { id: 'pub' }, priceList: { id: 'pl', currency: 'TRY' } }] } };
+    if (doc.includes('WholesaleCatalog(')) return { currentAppInstallation: { accessScopes: [{ handle: 'write_draft_orders' }] }, catalogs: { nodes: [{ id: 'gid://shopify/MarketCatalog/123', title: 'Toptan Katalog', status: 'ACTIVE', publication: { id: 'pub' }, priceList: { id: 'pl', currency: 'TRY' } }] } };
     if (doc.includes('RequestVariants(')) { assert.deepEqual(vars.ids, ['gid://shopify/ProductVariant/10']); assert.equal(vars.publication, 'pub'); return { nodes: [...offers().variants.values()] }; }
-    if (doc.includes('WholesalePrices(')) { assert.equal(vars.query, 'variant_id:10'); return { priceList: { prices: page([{ variant: { id: 'gid://shopify/ProductVariant/10' }, price: { amount: '395', currencyCode: 'TRY' }, quantityPriceBreaks: page([]) }]) } }; }
+    if (doc.includes('WholesalePrices(')) { assert.equal(vars.query, 'variant_id:10'); assert.match(doc, /prices\(first: 1,/); return { priceList: { prices: page([{ variant: { id: 'gid://shopify/ProductVariant/10' }, price: { amount: '395', currencyCode: 'TRY' }, quantityPriceBreaks: page([]) }]) } }; }
     assert.match(doc, /WholesaleRules/); return { priceList: { quantityRules: page([{ productVariant: { id: 'gid://shopify/ProductVariant/10' }, minimum: 6, increment: 6, maximum: null }]) } };
   } };
   const result = await liveOffers(client, '123', request().items);
@@ -126,4 +126,89 @@ test('Shopify write client uses fixed mutation, accepts valid draft from partial
   await assert.rejects(client.createDraftOrder({ lineItems: [] }), { code: 'mutation_uncertain' }); assert.equal(writes, 1);
   const partial = createShopifyClient(config, { fetchImpl: async url => new Response(JSON.stringify(url.endsWith('/access_token') ? { access_token: 'token', expires_in: 3600 } : { data: { draftOrderCreate: { draftOrder: { id: 'gid://shopify/DraftOrder/1', name: '#D1' } } }, errors: [{ message: 'partial' }] })) });
   assert.equal((await partial.createDraftOrder({})).name, '#D1');
+});
+
+test('reported Shopify read throttle never becomes an unknown/pending draft and can be retried normally', async () => {
+  const store = repository(); let reads = 0; let creates = 0;
+  const submit = service({ repository: store, getOffers: async () => {
+    if (++reads === 1) throw new ShopifyError('rate_limited', 'Shopify istek sınırına ulaşıldı.');
+    return offers();
+  }, client: { createDraftOrder: async () => { creates++; return { name: '#D100' }; } } });
+  const body = request();
+  const endpoint = createDraftHandler({ getService: () => submit }); const res = response();
+  await endpoint(httpRequest(body), res);
+  assert.equal(res.statusCode, 429); assert.equal(JSON.parse(res.body).safeToEdit, true);
+  assert.equal(await store.read(`request-${body.requestId}`), null); assert.equal(creates, 0);
+  const next = response(); await endpoint(httpRequest(body), next);
+  assert.equal(JSON.parse(next.body).name, '#D100'); assert.equal(creates, 1);
+});
+
+test('missing draft permission is reported distinctly before variant/price scans and before writing', async () => {
+  let queries = 0;
+  const client = { query: async doc => {
+    queries++; assert.match(doc, /currentAppInstallation/);
+    return { currentAppInstallation: { accessScopes: [{ handle: 'read_products' }] } };
+  } };
+  const submit = service({ client, getOffers: liveOffers });
+  const result = await submit.submit(request(), 'ip');
+  assert.equal(result.status, 403); assert.equal(result.code, 'draft_access_denied');
+  assert.equal(result.safeToEdit, true); assert.match(result.error, /write_draft_orders/); assert.equal(queries, 1);
+});
+
+async function deliveryModule() {
+  const { readFile } = require('node:fs/promises');
+  const source = await readFile(require('node:path').join(__dirname, '../public/submit-request.js'), 'utf8');
+  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+}
+test('browser automatically recovers an interrupted/pending submission with the original ID', async () => {
+  const { deliverDraft } = await deliveryModule(); let calls = 0; const body = request(); const sent = [];
+  const result = await deliverDraft(body, { pause: async () => {}, fetchImpl: async (_, init) => {
+    sent.push(JSON.parse(init.body)); calls++;
+    if (calls === 1) throw new Error('lost connection');
+    return new Response(JSON.stringify(calls === 2 ? { code: 'pending' } : { created: true, name: '#D5', requestId: body.requestId }), { status: calls === 2 ? 202 : 200 });
+  } });
+  assert.equal(result.name, '#D5'); assert.equal(calls, 3); assert.deepEqual(sent, [body, body, body]);
+});
+test('browser releases definitely unsent throttled/denied submissions and never displays a manual status action', async () => {
+  const { deliverDraft } = await deliveryModule(); let calls = 0;
+  const result = await deliverDraft(request(), { pause: async () => {}, fetchImpl: async () => {
+    calls++; return new Response(JSON.stringify({ code: 'rate_limited', safeToEdit: true, error: 'Busy' }), { status: 429 });
+  } });
+  assert.equal(result.safeToEdit, true); assert.equal(calls, 1);
+  const source = await require('node:fs/promises').readFile(require('node:path').join(__dirname, '../public/request.js'), 'utf8');
+  assert.ok(!source.includes('Talep durumunu kontrol et')); assert.ok(!source.includes('request-copy'));
+});
+
+test('full browser → HTTP → live-offer verification → Shopify transport recovers price and mutation throttles in one submission', async () => {
+  const { deliverDraft } = await deliveryModule();
+  let time = 0; let priceReads = 0; let writes = 0; let posts = 0; let created = 0; let input;
+  const page = nodes => ({ nodes, pageInfo: { hasNextPage: false, endCursor: null } });
+  const money = amount => ({ amount, currencyCode: 'TRY' });
+  const client = createShopifyClient({ shop: 'test.myshopify.com', clientId: 'id', secret: 'secret' }, {
+    now: () => time, pause: async ms => { time += ms; }, fetchImpl: async (url, init) => {
+      if (url.endsWith('/access_token')) return new Response(JSON.stringify({ access_token: 'token', expires_in: 3600 }));
+      const { query, variables } = JSON.parse(init.body); let data;
+      if (query.includes('WholesaleCatalog(')) data = { currentAppInstallation: { accessScopes: [{ handle: 'write_draft_orders' }] }, catalogs: { nodes: [{ id: 'gid://shopify/MarketCatalog/123', title: 'Toptan Katalog', status: 'ACTIVE', publication: { id: 'pub' }, priceList: { id: 'pl', currency: 'TRY' } }] } };
+      else if (query.includes('RequestVariants(')) data = { nodes: [...offers().variants.values()] };
+      else if (query.includes('WholesalePrices(')) {
+        assert.match(query, /prices\(first: 1,/); assert.equal(variables.query, 'variant_id:10');
+        if (++priceReads === 1) return new Response(JSON.stringify({ errors: [{ extensions: { code: 'THROTTLED' } }], extensions: { cost: { requestedQueryCost: 15, throttleStatus: { currentlyAvailable: 0, maximumAvailable: 1000, restoreRate: 100 } } } }));
+        data = { priceList: { prices: page([{ variant: { id: 'gid://shopify/ProductVariant/10' }, price: money('395.00'), quantityPriceBreaks: page([{ minimumQuantity: 12, price: money('393.00') }]) }]) } };
+      } else if (query.includes('WholesaleRules(')) data = { priceList: { quantityRules: page([{ productVariant: { id: 'gid://shopify/ProductVariant/10' }, minimum: 6, increment: 6, maximum: 24 }]) } };
+      else {
+        assert.match(query, /mutation CatalogRequest/); input = variables.input;
+        if (++writes === 1) return new Response('{}', { status: 429, headers: { 'Retry-After': '1' } });
+        created++; data = { draftOrderCreate: { draftOrder: { id: 'gid://shopify/DraftOrder/501', name: '#D501' }, userErrors: [] } };
+      }
+      return new Response(JSON.stringify({ data }));
+    },
+  });
+  const endpoint = createDraftHandler({ getService: () => serviceInstance });
+  const serviceInstance = service({ client, getOffers: liveOffers }); const body = request();
+  const result = await deliverDraft(body, { pause: async () => {}, fetchImpl: async (_, init) => {
+    posts++; const res = response(); await endpoint(httpRequest(init.body), res);
+    return new Response(res.body, { status: res.statusCode });
+  } });
+  assert.equal(result.name, '#D501'); assert.equal(posts, 1); assert.equal(priceReads, 2);
+  assert.equal(writes, 2); assert.equal(created, 1); assert.equal(input.lineItems[0].priceOverride.amount, '393.00');
 });

@@ -38,6 +38,7 @@ function createDraftHandler({ getService = service } = {}) {
       const body = await readBody(request);
       const ip = (process.env.VERCEL ? request.headers['x-vercel-forwarded-for'] : request.socket?.remoteAddress) ?? 'unknown';
       const result = await getService().submit(body, String(ip));
+      if (result.retryAfter) response.setHeader('Retry-After', String(result.retryAfter));
       const { status, ...payload } = result; response.statusCode = status;
       return response.end(JSON.stringify(payload));
     } catch (error) {

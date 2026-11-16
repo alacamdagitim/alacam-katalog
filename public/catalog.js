@@ -892,7 +892,7 @@ function displayCatalog(data, source) {
     if (!familiesByHandle.has(row.handle)) familiesByHandle.set(row.handle, []);
     familiesByHandle.get(row.handle).push(row);
   }
-  hydrateRequest(data.rows, Boolean(data.wholesale));
+  hydrateRequest(data.rows);
   refreshOpenProductStock?.();
   get('product-total').textContent = number.format(data.productCount);
   get('type-total').textContent = number.format(data.types.length);
@@ -912,12 +912,9 @@ function displayCatalog(data, source) {
 function setStatus(source) {
   state = source;
   const status = get('sync');
-  status.hidden = source !== 'saved';
-  status.textContent = status.hidden ? '' : `Kayıtlı katalog · ${syncTime.format(new Date(catalog.syncedAt))}`;
-  if (catalog?.source === 'shopify') {
-    status.hidden = false;
-    status.textContent = `${catalog.catalogTitle} · Shopify · ${syncTime.format(new Date(catalog.syncedAt))}`;
-  }
+  status.hidden = !catalog;
+  status.textContent = catalog
+    ? `${catalog.catalogTitle} · Shopify · ${syncTime.format(new Date(catalog.syncedAt))}` : '';
 }
 
 async function load() {

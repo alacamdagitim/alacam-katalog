@@ -1,4 +1,5 @@
 import { initBackdropDismiss } from './dialog-dismiss.js';
+import { deliverDraft } from './submit-request.js';
 import { salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 
 const STORAGE_KEY = 'alacam-katalog-talep-v1';
@@ -15,7 +16,6 @@ const EMPTY_THUMBNAIL = '<svg class="icon" aria-hidden="true"><use href="#i-box"
 let items = [];
 let ui;
 let catalogReady = false;
-let wholesaleActive = false;
 const offersById = new Map();
 
 function escapeHtml(value) {
@@ -40,7 +40,7 @@ export function requestStock(row, variant) {
 }
 
 export function requestAvailability(row, variant) {
-  if (wholesaleActive && !offersById.has(String(variant?.id ?? row.id))) return 'missing';
+  if (catalogReady && !offersById.has(String(variant?.id ?? row.id))) return 'missing';
   return requestStock(row, variant) === 'out' ? 'out' : null;
 }
 
@@ -59,7 +59,7 @@ export function requestOrder(row, variant) {
 function lineState(item) {
   const current = offersById.get(item.id);
   const { row, variant } = current ?? {};
-  const unavailable = row ? requestAvailability(row, variant) : wholesaleActive ? 'missing' : null;
+  const unavailable = row ? requestAvailability(row, variant) : catalogReady ? 'missing' : null;
   const rule = row ? wholesaleRule(row, variant) : null;
   const unitCents = rule ? wholesaleUnitCents(rule, salePrice(row, variant), item.quantity) : null;
   const limits = wholesaleLimits(rule);
@@ -133,30 +133,6 @@ function lineDescription(item) {
   return [item.traits, item.option].filter(Boolean).join(' · ');
 }
 
-function requestText(states = items.map(lineState)) {
-  const lines = items.map((item, index) => {
-    const name = [item.name, lineDescription(item)].filter(Boolean).join(' · ');
-    const current = offersById.get(item.id);
-    const sku = current?.variant?.sku ?? (current?.variant ? null : current?.row.sku) ?? item.sku;
-    const barcode = current?.variant?.barcode ?? (current?.variant ? null : current?.row.barcode) ?? item.barcode;
-    const identifiers = [
-      sku && `Ürün kodu ${sku}`,
-      barcode && `Barkod ${barcode}`,
-      `Varyant no ${item.id}`,
-    ].filter(Boolean);
-    const price = linePrice(states[index]);
-    return `${index + 1}. ${formatQuantity.format(item.quantity)} × ${name}\n   ${identifiers.join(' · ')}${price ? `\n   ${price}` : ''}`;
-  });
-  const note = ui.note?.value.trim();
-  const total = requestTotal(states);
-  return [
-    'Merhaba, aşağıdaki ürünler için teklif rica ederim.',
-    lines.join('\n'),
-    total != null && `Katalog toplamı ${wholesaleMoney(total)}`,
-    note && `Not: ${note}`,
-  ].filter(Boolean).join('\n\n');
-}
-
 export function requestCount() {
   return items.reduce((count, item) => count + item.quantity, 0);
 }
@@ -172,10 +148,9 @@ function updateActions() {
   ui.empty.hidden = items.length > 0 || !ui.result.hidden;
   ui.form.hidden = !items.length && !pendingRequest;
   ui.dialog.dataset.empty = String(!items.length && !pendingRequest);
-  ui.copy.disabled = !enabled;
-  ui.send.disabled = submitting || (!pendingRequest && !enabled);
+  ui.send.disabled = submitting || Boolean(pendingRequest) || !enabled;
   ui.send.setAttribute('aria-disabled', String(ui.send.disabled));
-  ui.send.textContent = submitting ? 'Gönderiliyor…' : pendingRequest ? 'Talep durumunu kontrol et' : 'Talep oluştur';
+  ui.send.textContent = submitting ? 'Gönderiliyor…' : 'Talep oluştur';
   ui.fields.disabled = submitting || Boolean(pendingRequest);
   ui.dialog.dataset.submitting = String(submitting || Boolean(pendingRequest));
   for (const control of ui.list.querySelectorAll('input, button')) {
@@ -185,7 +160,6 @@ function updateActions() {
   ui.totalAmount.textContent = total == null ? '' : wholesaleMoney(total);
   ui.status.textContent = submissionMessage || (blocked ? 'Devam etmek için işaretli ürünleri veya miktarları kontrol edin.'
     : !catalogReady && items.length ? 'Katalog ve talep fiyatları doğrulanıyor…' : '');
-  ui.preview.hidden = true;
   if (ui.note) ui.note.disabled = !items.length || submitting || Boolean(pendingRequest);
 }
 
@@ -286,9 +260,8 @@ export function setRequestQuantity(row, variant, quantity) {
   return true;
 }
 
-export function hydrateRequest(rows, active = false) {
+export function hydrateRequest(rows) {
   catalogReady = true;
-  wholesaleActive = active;
   offersById.clear();
   for (const row of rows) {
     offersById.set(String(row.id), { row });
@@ -328,20 +301,13 @@ export function initRequest() {
     list: get('request-items'),
     empty: get('request-empty'),
     note: get('request-note'),
-    copy: get('request-copy'),
     send: get('request-send'),
     status: get('request-status'),
     total: get('request-total'),
     totalAmount: get('request-total-amount'),
     form: get('request-contact'), fields: get('request-fields'), result: get('request-result'),
     company: get('request-company'), name: get('request-name'), email: get('request-email'), phone: get('request-phone'),
-    preview: document.createElement('textarea'),
   };
-  ui.preview.className = 'request-copy-preview';
-  ui.preview.setAttribute('aria-label', 'Talep metni');
-  ui.preview.readOnly = true;
-  ui.preview.hidden = true;
-  ui.status.after(ui.preview);
   items = readItems();
   if (ui.note) ui.note.value = readNote();
   try {
@@ -350,7 +316,7 @@ export function initRequest() {
       pendingRequest = saved;
       for (const key of ['company', 'name', 'email', 'phone']) ui[key].value = saved.contact[key] ?? '';
       ui.note.value = saved.note;
-      submissionMessage = 'Önceki talebinizin durumunu kontrol edin. Talep kodu: ' + saved.requestId;
+      submissionMessage = 'Talebiniz gönderiliyor…';
     }
   } catch { /* Session persistence may be unavailable. */ }
   render();
@@ -415,9 +381,9 @@ export function initRequest() {
     saveValue(NOTE_STORAGE_KEY, ui.note.value.slice(0, ui.note.maxLength));
     updateActions();
   });
-  ui.form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (submitting || ui.send.disabled) return;
+  async function sendRequest(event) {
+    event?.preventDefault();
+    if (submitting || (!pendingRequest && ui.send.disabled)) return;
     if (!pendingRequest && !ui.form.reportValidity()) return;
     if (!pendingRequest) {
       pendingRequest = {
@@ -439,12 +405,8 @@ export function initRequest() {
     submissionMessage = 'Fiyatlar ve koli adetleri kontrol ediliyor, talebiniz gönderiliyor…';
     updateActions();
     try {
-      const response = await fetch('/api/draft-request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sent), signal: AbortSignal.timeout(100000),
-      });
-      const result = await response.json();
-      if (response.ok && result.created === true && typeof result.name === 'string' && result.requestId === sent.requestId) {
+      const result = await deliverDraft(sent);
+      if (result.created === true) {
         // Keep any other products added in another tab while this request was sent.
         items = readItems().flatMap(item => {
           const submitted = sent.items.find(line => line.id === item.id);
@@ -469,26 +431,14 @@ export function initRequest() {
         } else submissionMessage += ' Talep kodu: ' + sent.requestId;
       }
     } catch {
-      submissionMessage = 'Bağlantı kesildi. Aynı talebi yeniden oluşturmadan durumunu kontrol edin. Talep kodu: ' + sent.requestId;
+      submissionMessage = 'Talebin sonucu doğrulanamadı. Bizimle iletişime geçebilirsiniz. Talep kodu: ' + sent.requestId;
     } finally {
       submitting = false;
       render();
     }
-  });
-  ui.copy.addEventListener('click', async () => {
-    if (ui.copy.disabled) return;
-    const draft = requestText();
-    try {
-      await navigator.clipboard.writeText(draft);
-      ui.status.textContent = 'Talep metni kopyalandı.';
-    } catch {
-      ui.preview.value = draft;
-      ui.preview.hidden = false;
-      ui.preview.focus();
-      ui.preview.select();
-      ui.status.textContent = 'Talep metnini kopyalayabilirsiniz.';
-    }
-  });
+  }
+  ui.form.addEventListener('submit', sendRequest);
+  if (pendingRequest) void sendRequest();
   window.addEventListener('storage', (event) => {
     const noteChanged = ui.note && (event.key === NOTE_STORAGE_KEY || event.key === null);
     if (noteChanged) ui.note.value = readNote();

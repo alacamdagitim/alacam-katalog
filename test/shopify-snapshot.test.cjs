@@ -167,3 +167,10 @@ test('browser and HTML contain no storefront/CSV fallback or per-product loading
   const { validCatalog } = await import(`data:text/javascript;base64,${Buffer.from(cacheSource).toString('base64')}`);
   assert.equal(validCatalog(snapshot()), true); assert.equal(validCatalog({ ...snapshot(), source: 'retail' }), false);
 });
+
+test('normalization no longer accepts old storefront metadata price or barcode overrides', () => {
+  const { normalizeCatalog } = require('../lib/catalog.cjs');
+  const data = normalizeCatalog([rawProduct], { '10': { barcode: '9999999999999', unitPrice: 0.01, unitPriceUnit: 'adet', price: 9999, ratio: 0.00001 } });
+  assert.equal(data.rows[0].barcode, rawProduct.variants[0].barcode);
+  assert.notEqual(data.rows[0].unitPrice, 0.01);
+});

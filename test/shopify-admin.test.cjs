@@ -107,3 +107,48 @@ test('status endpoint fails closed with absent settings, does not accept writes'
     else process.env.SHOPIFY_SHOP = previous;
   }
 });
+
+test('retries confirmed Shopify query throttles using restore-rate budget and serializes concurrent reads', async () => {
+  let time = 0; const waits = []; let calls = 0; let active = 0; let peak = 0;
+  const client = createShopifyClient(configuration(env), { now: () => time, pause: async ms => { waits.push(ms); time += ms; }, fetchImpl: async url => {
+    if (url.endsWith('/access_token')) return result({ access_token: 'token', expires_in: 3600 });
+    peak = Math.max(peak, ++active); await new Promise(resolve => setImmediate(resolve)); active--;
+    calls++;
+    return result(calls === 1 ? { errors: [{ extensions: { code: 'THROTTLED' } }], extensions: { cost: {
+      requestedQueryCost: 200, throttleStatus: { currentlyAvailable: 0, maximumAvailable: 1000, restoreRate: 100 } } }
+    } : { data: { ok: true }, extensions: { cost: { requestedQueryCost: 200, throttleStatus: { currentlyAvailable: 20, maximumAvailable: 1000, restoreRate: 100 } } } });
+  } });
+  await Promise.all([client.query('query First { shop { id } }'), client.query('query Next { shop { id } }')]);
+  assert.equal(calls, 3); assert.equal(peak, 1); assert.ok(waits[0] >= 2000);
+});
+
+test('explicit 429 / THROTTLED writes are retried, ambiguous write failures are never repeated', async () => {
+  for (const http of [true, false]) {
+    let time = 0; let calls = 0;
+    const client = createShopifyClient(configuration(env), { now: () => time, pause: async ms => { time += ms; }, fetchImpl: async url => {
+      if (url.endsWith('/access_token')) return result({ access_token: 'token', expires_in: 3600 });
+      calls++;
+      if (calls === 1) return http ? new Response('{}', { status: 429, headers: { 'Retry-After': '2' } }) : result({ errors: [{ extensions: { code: 'THROTTLED' } }] });
+      return result({ data: { draftOrderCreate: { draftOrder: { id: 'gid://shopify/DraftOrder/123', name: '#D123' } } } });
+    } });
+    assert.equal((await client.createDraftOrder({ lineItems: [] })).name, '#D123'); assert.equal(calls, 2); assert.ok(time >= (http ? 2000 : 500));
+  }
+  let calls = 0;
+  const uncertain = createShopifyClient(configuration(env), { fetchImpl: async url => {
+    if (url.endsWith('/access_token')) return result({ access_token: 'token', expires_in: 3600 });
+    calls++; return result({}, 500);
+  } });
+  await assert.rejects(uncertain.createDraftOrder({}), { code: 'mutation_uncertain' }); assert.equal(calls, 1);
+});
+
+test('exhausted query throttles are bounded, sanitize upstream errors, and remain safely unsent', async () => {
+  let time = 0; let calls = 0;
+  const client = createShopifyClient(configuration(env), { now: () => time, pause: async ms => { time += ms; }, fetchImpl: async url => {
+    if (url.endsWith('/access_token')) return result({ access_token: 'token', expires_in: 3600 });
+    calls++; return result({ errors: [{ message: env.SHOPIFY_CLIENT_SECRET, extensions: { code: 'THROTTLED' } }] });
+  } });
+  await assert.rejects(client.query('query Slow { shop { id } }'), error => {
+    assert.equal(error.code, 'rate_limited'); assert.ok(!error.message.includes(env.SHOPIFY_CLIENT_SECRET)); return true;
+  });
+  assert.ok(calls <= 7); assert.ok(time <= 45000);
+});

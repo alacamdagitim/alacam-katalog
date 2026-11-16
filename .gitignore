@@ -3,4 +3,5 @@
 .vercel/
 node_modules/
 !/lib/
-public/catalog-data.json.*.tmp
+tmp/
+outputs/

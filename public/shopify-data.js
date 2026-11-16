@@ -66,6 +66,7 @@ export function assembleShopifyCatalog(info, pages, prices, rules) {
 }
 
 export async function readShopifyCatalog(info, read, progress = () => {}) {
+  let loadedPrices = 0;
   async function collect(part, productIds = []) {
     let after = null; const seen = new Set(); const result = [];
     for (let page = 0; page < 2000; page++) {
@@ -76,10 +77,11 @@ export async function readShopifyCatalog(info, read, progress = () => {}) {
       if (body.enabled !== true || body.catalogId !== info.id || typeof body.pageInfo?.hasNextPage !== 'boolean') fail();
       if (part === 'products') {
         result.push(body.data);
-        progress(result.reduce((count, data) => count + (data?.productCount ?? 0), 0));
+        progress(result.reduce((count, data) => count + (data?.productCount ?? 0), 0), 'products');
       } else {
         if (!Array.isArray(body[part])) fail();
         result.push(...body[part]);
+        if (part === 'prices') { loadedPrices += body.prices.length; progress(loadedPrices, 'prices'); }
       }
       if (!body.pageInfo.hasNextPage) return result;
       after = body.pageInfo.endCursor;

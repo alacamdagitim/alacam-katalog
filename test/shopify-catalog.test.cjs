@@ -105,3 +105,27 @@ test('follows all stream cursors, rejects loops, wrong catalog and a failed stre
   await assert.rejects(readShopifyCatalog(info, async () => { throw new Error('source failed'); }));
   await assert.rejects(readShopifyCatalog(info, async (url) => ({ enabled: true, catalogId: '123', pageInfo: { hasNextPage: true, endCursor: 'same' }, ...(url.includes('products') ? { data: { rows: [] } } : url.includes('prices') ? { prices: [] } : { rules: [] }) })));
 });
+
+test('production cannot fall back to retail when Shopify settings are absent', async () => {
+  const keys = ['VERCEL', 'SHOPIFY_SHOP', 'SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET', 'SHOPIFY_CATALOG_ID'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  const endpoint = require('../api/shopify-catalog.js');
+  const response = () => ({ setHeader() {}, end(body) { this.body = body; } });
+  try {
+    for (const key of keys) delete process.env[key];
+    process.env.VERCEL = '1';
+    const production = response();
+    await endpoint({ method: 'GET', url: '/api/shopify-catalog?part=info' }, production);
+    assert.equal(production.statusCode, 503);
+    assert.equal(JSON.parse(production.body).code, 'configuration_missing');
+    delete process.env.VERCEL;
+    const local = response();
+    await endpoint({ method: 'GET', url: '/api/shopify-catalog?part=info' }, local);
+    assert.deepEqual(JSON.parse(local.body), { enabled: false });
+    const invalid = response();
+    await endpoint({ method: 'GET', url: '/api/shopify-catalog?part=prices&products=1,not-an-id' }, invalid);
+    assert.equal(invalid.statusCode, 400);
+  } finally {
+    for (const key of keys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; }
+  }
+});

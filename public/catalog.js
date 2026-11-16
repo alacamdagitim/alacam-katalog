@@ -957,10 +957,12 @@ async function load() {
         }
         throw new Error('Shopify istek sınırı');
       };
-      const data = await readShopifyCatalog(source.catalog, read, (count) => {
+      const data = await readShopifyCatalog(source.catalog, read, (count, phase) => {
         if (revision !== loadRevision) return;
         get('sync').hidden = false;
-        get('sync').textContent = `${source.catalog.title} yükleniyor… ${number.format(count)} ürün`;
+        get('sync').textContent = phase === 'prices'
+          ? `${source.catalog.title} fiyatları eşleştiriliyor… ${number.format(count)} varyant`
+          : `${source.catalog.title} yükleniyor… ${number.format(count)} ürün`;
       });
       if (revision !== loadRevision) return;
       displayCatalog(data, 'live');

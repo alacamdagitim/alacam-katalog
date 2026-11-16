@@ -5,6 +5,7 @@ const path = require('node:path');
 const serveCatalog = require('../api/catalog.js');
 const serveInstallments = require('../api/installments.js');
 const serveWholesale = require('../api/wholesale.js');
+const serveShopifyStatus = require('../api/shopify-status.js');
 
 const root = path.resolve(__dirname, '../public');
 const types = {
@@ -23,6 +24,7 @@ http.createServer(async (request, response) => {
     if (url.pathname === '/api/catalog') return await serveCatalog(request, response);
     if (url.pathname === '/api/installments') return await serveInstallments(request, response);
     if (url.pathname === '/api/wholesale') return await serveWholesale(request, response);
+    if (url.pathname === '/api/shopify-status') return await serveShopifyStatus(request, response);
     const file = path.resolve(root, `.${decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)}`);
     if (!file.startsWith(root + path.sep) || !(await stat(file)).isFile()) throw new Error('Dosya bulunamadı');
     response.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');

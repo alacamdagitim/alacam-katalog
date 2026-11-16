@@ -7,7 +7,8 @@
   "functions": {
     "api/catalog.js": { "maxDuration": 30 },
     "api/installments.js": { "maxDuration": 20 },
-    "api/wholesale.js": { "maxDuration": 30 }
+    "api/wholesale.js": { "maxDuration": 30 },
+    "api/shopify-status.js": { "maxDuration": 30 }
   },
   "headers": [
     { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }

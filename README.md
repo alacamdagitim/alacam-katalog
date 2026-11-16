@@ -18,6 +18,16 @@ Katalog sayfası arama motorları için `noindex` olarak işaretlenir. Yayın ba
 
 ## Ürün verisi
 
+### Shopify uygulama bağlantısı
+
+Vercel üretim ortamında `SHOPIFY_SHOP` (`dx0nin-1q.myshopify.com`), `SHOPIFY_CATALOG_ID` (`160658587954`), `SHOPIFY_CLIENT_ID` ve Secret türünde `SHOPIFY_CLIENT_SECRET` tanımlanır. Anahtarlar yalnızca sunucuda kullanılır; uygulama mağazayla aynı Shopify kuruluşunda olmalı ve mağazaya yüklenmiş olmalıdır. Sunucu erişim belirtecini gerektiğinde yeniler.
+
+Yeni kod dağıtıldıktan sonra `/api/shopify-status` bağlantıyı, tam katalog kimliğini, etkinlik durumunu ve kurulu uygulamanın izinlerini kontrol eder. Başarılı yanıtta `connected: true` ve `catalog.title` bulunur. `capabilities.createDraftOrder`, taslak oluşturma izninin bulunup bulunmadığını belirtir; taslak siparişin oluşturulduğu anlamına gelmez. Hata yanıtında yalnızca kontrollü hata kodu ve açıklaması döner; gizli anahtar veya erişim belirteci dönmez. Yerel kontrol için aynı ortam değişkenleriyle `npm run dev` çalıştırılır.
+
+Bu ilk aşama yalnızca bağlantı kontrolüdür. Mevcut katalog/CSV yayını ve WhatsApp sepet akışı korunur. Shopify fiyat ve koli kuralı eşitlemesi ile taslak sipariş gönderim arayüzü henüz bu uç noktaya bağlı değildir. Kullanıcı, ayrı Dijital Katalog bağlantısına sahip herkesin toptan fiyatları görebilmesini seçmiştir; giriş doğrulanmadan Shopify şirket hesabına sipariş ataması yapılmamalıdır.
+
+Kaynaklar: [Shopify uygulama kimlik doğrulaması](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant), [katalog sorgusu](https://shopify.dev/docs/api/admin-graphql/latest/queries/catalogs).
+
 Arayüz önce kayıtlı kataloğu gösterir, ardından Alaçam Dağıtım mağazasının herkese açık ürün listesini sunucu üzerinden kontrol eder. Vercel güncel yanıtı 15 dakika önbelleğe alır. Kaynağa ulaşılamadığında arayüz son paketlenmiş veriyi ve tarihini gösterir. Kayıtlı veriyi yenilemek için `npm run sync` çalıştırın.
 
 Barkod ve ölçü bilgileri `npm run sync` ile güncellenir. Mağaza istek sınırına ulaşıldığında doğrulanan bilgiler saklanır ve sonraki eşitleme eksik ürünlerden devam eder.

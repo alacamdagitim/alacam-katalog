@@ -2067,6 +2067,10 @@ get('share').addEventListener('click', async () => {
 
 initRequest();
 get('request-open').addEventListener('request:changed', () => refreshOpenProductStock?.());
+get('request-open').addEventListener('request:new', () => {
+  if (browsingCategories) openCategory();
+  get('search').focus({ preventScroll: true });
+});
 
 window.addEventListener('catalog:refresh', () => load());
 load();

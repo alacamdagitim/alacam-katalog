@@ -1720,6 +1720,8 @@ body:has(.request-dialog[open]) { overflow: hidden; }
 .request-result { margin-top: 20px; padding: 18px; border: 1px solid #b8d9c4; border-radius: 14px; background: #f0faf3; color: #205a35; line-height: 1.6; overflow-wrap: anywhere; }
 .request-result strong { display: block; }
 .request-result p { margin: 6px 0 0; font-size: 13px; }
+.request-result .button { width: 100%; margin-top: 16px; min-height: 44px; }
+.request-bot-field { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .request-dialog[data-submitting="true"] .request-items { pointer-events: none; opacity: .65; }
 @media (max-width: 380px) { .request-contact fieldset { grid-template-columns: minmax(0, 1fr); } }
 .request-items { margin: 0; padding: 0; list-style: none; }

@@ -36,8 +36,26 @@ Sunucu gönderimde yalnızca seçilen varyantların fiyatlarını, stok/yayın d
 
 Shopify sorguları istemci içinde sıraya alınır; yanıtın `throttleStatus` bütçesi ve `restoreRate` değerine göre beklenir. Seçilen bir varyantın fiyatı için 100 kayıtlık sorgu yerine tek kayıt istenir. `THROTTLED` / HTTP 429 ile çalıştırılmadan reddedilen işlemler sınırlı süre içinde yeniden denenir; belirsiz bir mutasyon tekrar çalıştırılmaz. Taslak oluşturmadan önceki okuma hatası, taslak oluşturulmuş gibi değerlendirilmez: form açık kalır ve normal “Talep oluştur” düğmesi kullanılabilir. `write_draft_orders` izni gönderim öncesinde kontrol edilir.
 
-Her talebin UUID kodu, gönderilmeden önce sekme deposuna yazılır. Private Blob’da koşullu oluşturulan kalıcı niyet kaydı eşzamanlı gönderimlerin aynı kodla ikinci taslağı oluşturmasını engeller. Sonuç belirsizse mutasyon tekrar edilmez; aynı kodla otomatik kurtarma Shopify’daki benzersiz etiketten taslağı arar. Kullanıcıya ayrı durum kontrolü veya talep kopyalama adımı sunulmaz. Kalıcı niyet kaydında iletişim bilgileri tutulmaz; içerik özeti, durum ve talep numarası bulunur. Aynı kaynak IP’den on dakikada en fazla 10 yeni deneme kabul edilir. Uç nokta aynı kökenli JSON POST kabul eder; istemciye Shopify anahtarı verilmez.
+Her talebin UUID kodu, gönderilmeden önce sekme deposuna yazılır. Private Blob’da koşullu oluşturulan kalıcı niyet kaydı eşzamanlı gönderimlerin aynı kodla ikinci taslağı oluşturmasını engeller. Sonuç belirsizse mutasyon tekrar edilmez; aynı kodla otomatik kurtarma Shopify’daki benzersiz etiketten taslağı arar. Kullanıcıya ayrı durum kontrolü veya talep kopyalama adımı sunulmaz. Kalıcı niyet kaydında iletişim bilgileri tutulmaz; içerik özeti, durum ve talep numarası bulunur. Uç nokta aynı kökenli JSON POST kabul eder; istemciye Shopify anahtarı verilmez.
+
+Onay ekranındaki “Yeni talep oluştur” düğmesi kataloğa döndürür; arama/filtreler ve aynı sekmedeki firma bilgileri korunur. Yeni ürünler seçilip tekrar gönderilebilir.
 
 Taksit tablosu, ürün seçenekleri, koli bilgileri, filtreler ve görünüm ayarları kullanılmaya devam eder. Eski mağaza metadata dosyalarından fiyat/barkod aktarımı ve fiyat yükleme arayüzüne ait kullanılmayan simgeler/stiller kaldırılmıştır.
+
+## Talep suistimaline karşı koruma
+
+Sınırlar sunucuda, Shopify sorgularından önce uygulanır. Bir ziyaretçi JavaScript’i değiştirse veya farklı sunucu örneklerine istek gönderse de Private Blob’daki tek koşullu kayıt ortak kotayı korur. Sayaçlar kayan zaman aralıkları kullanır; sabit saat sınırında iki kat gönderim yapılmaz.
+
+| Kapsam | Başlangıç sınırı |
+| --- | --- |
+| Aynı IP / IPv6 ağının /64 bölümü | 10 dakikada 5, 24 saatte 30 yeni deneme |
+| Aynı e-posta (büyük/küçük harften bağımsız) | 10 dakikada 3, 24 saatte 20 yeni deneme |
+| Tüm katalog | Dakikada 15, saatte 60, 24 saatte 300 yeni deneme |
+
+Sınırlar `lib/request-guard.cjs` içindeki `DEFAULT_LIMITS` değerleriyle ayarlanır. Ürün doğrulamasında başarısız olan yeni denemeler de kotadan düşer. Aynı talep kodunun bağlantı kesintisi sonrası kurtarılması kotayı yeniden tüketmez. Kota bittiğinde 429 ve `Retry-After` döner; formda yaklaşık bekleme süresi gösterilir.
+
+Aynı içerik farklı talep kodlarıyla beş dakika içinde gönderilirse koşullu içerik kaydı ikinci Shopify taslağını engeller; mevcut talep numarası ve tekrar açıklaması gösterilir. Ürün, miktar veya not değiştiğinde ayrı bir talep oluşturulabilir. Başarısız olduğu kesinleşmiş mutasyon yeni gönderimi engellemez.
+
+Görünmeyen bot tuzağı, köken doğrulaması, 20 KB gövde ve 50 ürün sınırları korunur. IP yalnızca Vercel’in `x-vercel-forwarded-for` başlığından alınır; istemcinin normal `X-Forwarded-For` başlığına güvenilmez. Sayaçlarda ham IP/e-posta saklanmaz; sunucu anahtarıyla HMAC özeti ve zaman damgası tutulur. Bu önlemler uygulama katmanındadır; CAPTCHA veya Vercel Firewall yapılandırması eklenmemiştir.
 
 Kaynaklar: [Shopify fiyat listesi](https://shopify.dev/docs/api/admin-graphql/latest/objects/PriceList), [taslak sipariş oluşturma](https://shopify.dev/docs/api/admin-graphql/latest/mutations/draftOrderCreate), [Vercel arka plan işlemleri](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package), [Private Blob](https://vercel.com/docs/vercel-blob/private-storage).

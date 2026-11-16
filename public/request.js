@@ -306,7 +306,7 @@ export function initRequest() {
     total: get('request-total'),
     totalAmount: get('request-total-amount'),
     form: get('request-contact'), fields: get('request-fields'), result: get('request-result'),
-    company: get('request-company'), name: get('request-name'), email: get('request-email'), phone: get('request-phone'),
+    company: get('request-company'), name: get('request-name'), email: get('request-email'), phone: get('request-phone'), website: get('request-website'),
   };
   items = readItems();
   if (ui.note) ui.note.value = readNote();
@@ -323,6 +323,15 @@ export function initRequest() {
 
   ui.open.addEventListener('click', () => {
     if (!ui.dialog.open) ui.dialog.showModal();
+  });
+  ui.result.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-new-request]') || submitting || pendingRequest) return;
+    ui.result.hidden = true;
+    ui.result.replaceChildren();
+    submissionMessage = '';
+    render();
+    ui.dialog.close();
+    ui.open.dispatchEvent(new Event('request:new'));
   });
   initBackdropDismiss(ui.dialog);
   ui.list.addEventListener('error', (event) => {
@@ -390,6 +399,7 @@ export function initRequest() {
         requestId: crypto.randomUUID(),
         contact: Object.fromEntries(['company', 'name', 'email', 'phone'].map(key => [key, ui[key].value.trim()])),
         note: ui.note.value.trim(),
+        website: ui.website.value,
         items: items.map(item => ({ id: item.id, quantity: item.quantity, unitCents: lineState(item).unitCents })),
       };
       // Persist before sending: a reload must reuse the same request ID.
@@ -418,7 +428,10 @@ export function initRequest() {
         pendingRequest = null;
         sessionStorage.removeItem(PENDING_KEY);
         submissionMessage = '';
-        ui.result.innerHTML = `<strong>Talebiniz alındı · ${escapeHtml(result.name)}</strong><p>Sipariş talebiniz ekibimize iletildi. İletişim bilgileriniz üzerinden size dönüş yapacağız.</p>`;
+        ui.website.value = '';
+        ui.result.innerHTML = `<strong>${result.duplicate ? 'Bu talep zaten alındı' : 'Talebiniz alındı'} · ${escapeHtml(result.name)}</strong><p>${result.duplicate
+          ? 'Aynı içerikli talebiniz zaten kayıtlı. Yeni ürünler veya farklı bir not ile yeni talep oluşturabilirsiniz.'
+          : 'Sipariş talebiniz ekibimize iletildi. İletişim bilgileriniz üzerinden size dönüş yapacağız.'}</p><button type="button" class="button button-accent" data-new-request>Yeni talep oluştur</button>`;
         ui.result.hidden = false;
         ui.result.tabIndex = -1;
         ui.result.focus({ preventScroll: true });

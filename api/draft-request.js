@@ -1,5 +1,6 @@
 const { shopifyClient, ShopifyError } = require('../lib/shopify-admin.cjs');
 const { snapshotRepository } = require('../lib/shopify-snapshot.cjs');
+const { clientAddress } = require('../lib/request-guard.cjs');
 const { RequestError, createDraftService } = require('../lib/shopify-draft.cjs');
 let shared;
 function service() {
@@ -25,7 +26,7 @@ async function readBody(request) {
   const raw = Buffer.concat(chunks).toString('utf8');
   try { return JSON.parse(raw); } catch { throw new RequestError(400, 'invalid_request', 'Talep bilgileri okunamadı.'); }
 }
-function createDraftHandler({ getService = service } = {}) {
+function createDraftHandler({ getService = service, deployed = Boolean(process.env.VERCEL) } = {}) {
   return async (request, response) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
     response.setHeader('Cache-Control', 'no-store'); response.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -33,17 +34,19 @@ function createDraftHandler({ getService = service } = {}) {
     try {
       const origin = request.headers.origin;
       // Browser submissions must originate on this deployment, including local preview.
-      if (!origin || new URL(origin).host !== request.headers.host || request.headers['sec-fetch-site'] === 'cross-site') throw new RequestError(403, 'forbidden', 'Bu adresten talep gönderilemiyor.');
+      let parsedOrigin;
+      try { parsedOrigin = new URL(origin); } catch { /* reject below */ }
+      if (!parsedOrigin || !['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.host !== request.headers.host || request.headers['sec-fetch-site'] === 'cross-site') throw new RequestError(403, 'forbidden', 'Bu adresten talep gönderilemiyor.');
       if (!/^application\/json(?:;|$)/i.test(request.headers['content-type'] ?? '')) throw new RequestError(415, 'invalid_request', 'JSON talep bilgileri gerekli.');
       const body = await readBody(request);
-      const ip = (process.env.VERCEL ? request.headers['x-vercel-forwarded-for'] : request.socket?.remoteAddress) ?? 'unknown';
-      const result = await getService().submit(body, String(ip));
+      const result = await getService().submit(body, clientAddress(request, deployed));
       if (result.retryAfter) response.setHeader('Retry-After', String(result.retryAfter));
       const { status, ...payload } = result; response.statusCode = status;
       return response.end(JSON.stringify(payload));
     } catch (error) {
       const known = error instanceof RequestError || error instanceof ShopifyError;
       response.statusCode = error instanceof RequestError ? error.status : 503;
+      if (error.retryAfter) response.setHeader('Retry-After', String(error.retryAfter));
       return response.end(JSON.stringify({ code: known ? error.code : 'unavailable', error: known ? error.message : 'Talep gönderilemiyor. Biraz sonra durumunu kontrol edin.', safeToEdit: error instanceof RequestError && error.code !== 'request_conflict' }));
     }
   };

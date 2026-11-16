@@ -36,7 +36,7 @@ test('rejects tampered prices, invalid box sizes, excluded and unavailable produ
   let writes = 0;
   const submit = service({ client: { createDraftOrder: async () => { writes++; } } });
   for (const [change, code] of [[{ unitCents: 1 }, 'price_changed'], [{ quantity: 7 }, 'quantity_changed'], [{ quantity: 30 }, 'quantity_changed'], [{ id: '999' }, 'catalog_changed']]) {
-    const body = request(); Object.assign(body.items[0], change);
+    const body = request(); body.contact.email = code + '@example.com'; Object.assign(body.items[0], change);
     await assert.rejects(submit.submit(body, 'ip'), { code });
   }
   const unavailable = offers(); unavailable.variants.get('10').availableForSale = false;
@@ -99,7 +99,7 @@ test('HTTP endpoint blocks foreign origins, writes through GET, oversized input 
   }
   assert.equal(calls, 0); const res = response(); await endpoint(httpRequest(request()), res); assert.equal(res.statusCode, 201);
   const submit = service();
-  for (let i = 0; i < 10; i++) await submit.submit(request(), 'ip');
+  for (let i = 0; i < 3; i++) await submit.submit(request(), 'ip');
   await assert.rejects(submit.submit(request(), 'ip'), { status: 429 });
 });
 
@@ -211,4 +211,63 @@ test('full browser → HTTP → live-offer verification → Shopify transport re
   } });
   assert.equal(result.name, '#D501'); assert.equal(posts, 1); assert.equal(priceReads, 2);
   assert.equal(writes, 2); assert.equal(created, 1); assert.equal(input.lineItems[0].priceOverride.amount, '393.00');
+});
+
+test('identical content with a different ID reuses the receipt; a genuinely new request creates a second draft', async () => {
+  let writes = 0; const submit = service({ client: { createDraftOrder: async () => ({ name: `#D${++writes}` }) } });
+  const first = request(); assert.equal((await submit.submit(first, 'ip')).name, '#D1');
+  const repeated = { ...first, requestId: randomUUID() };
+  const duplicate = await submit.submit(repeated, 'ip');
+  assert.equal(duplicate.name, '#D1'); assert.equal(duplicate.duplicate, true); assert.equal(duplicate.requestId, repeated.requestId);
+  assert.equal((await submit.submit(repeated, 'ip')).name, '#D1');
+  const next = { ...first, requestId: randomUUID(), note: 'İkinci teslimat için ayrı talep' };
+  assert.equal((await submit.submit(next, 'ip')).name, '#D2'); assert.equal(writes, 2);
+});
+
+test('simultaneous identical requests with different IDs coalesce across instances', async () => {
+  const repositoryInstance = repository(); let writes = 0; let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const client = { createDraftOrder: async () => { writes++; await gate; return { name: '#D1' }; } };
+  const a = service({ repository: repositoryInstance, client }); const b = service({ repository: repositoryInstance, client });
+  const first = request(); const second = { ...first, requestId: randomUUID() };
+  const pending = a.submit(first, 'ip'); await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await b.submit(second, 'ip')).status, 202);
+  release(); await pending;
+  assert.equal((await b.submit(second, 'ip')).name, '#D1'); assert.equal(writes, 1);
+});
+
+test('bot trap and quotas block before Shopify calls; same-ID receipt recovery still works after quotas fill', async () => {
+  let reads = 0; const submit = service({ getOffers: async () => { reads++; return offers(); } });
+  const bot = { ...request(), website: 'https://spam.example' };
+  await assert.rejects(submit.submit(bot, 'ip'), { status: 400 }); assert.equal(reads, 0);
+  const first = request(); await submit.submit(first, 'ip');
+  for (let i = 0; i < 2; i++) await submit.submit({ ...request(), note: String(i) }, 'ip');
+  await assert.rejects(submit.submit(request(), 'ip'), { status: 429 });
+  assert.equal(reads, 3); assert.equal((await submit.submit(first, 'ip')).created, true);
+  assert.equal(reads, 3);
+});
+
+test('a rejected mutation does not prevent a corrected retry with identical content', async () => {
+  let writes = 0;
+  const submit = service({ client: { createDraftOrder: async () => {
+    if (++writes === 1) throw new ShopifyError('draft_rejected', 'rejected');
+    return { name: '#D2' };
+  } } });
+  const body = request(); assert.equal((await submit.submit(body, 'ip')).safeToEdit, true);
+  assert.equal((await submit.submit({ ...body, requestId: randomUUID() }, 'ip')).name, '#D2');
+});
+
+test('2000 forged new IDs with rotating IP/email values cannot flood Shopify or grow per-attempt files', async () => {
+  const records = repository(); let writes = 0; let reads = 0;
+  const submit = service({ repository: records, now: () => 1000000,
+    getOffers: async () => { reads++; return offers(); },
+    client: { createDraftOrder: async () => ({ name: `#D${++writes}` }) },
+  });
+  for (let i = 0; i < 2000; i++) {
+    const body = request(); body.contact.email = `attacker-${i}@example.com`;
+    if (i < 15) assert.equal((await submit.submit(body, `rotating-ip-${i}`)).created, true);
+    else await assert.rejects(submit.submit(body, `rotating-ip-${i}`), { status: 429, code: 'request_rate_limited' });
+  }
+  assert.equal(writes, 15); assert.equal(reads, 15);
+  assert.equal(records.records.size, 31);
 });

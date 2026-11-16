@@ -2,9 +2,9 @@ import { initRequest, setRequestQuantity, hydrateRequest, requestCount, requestS
 import { initColumnReorder } from './column-reorder.js';
 import { initColumnWidths } from './column-widths.js';
 import { initBackdropDismiss } from './dialog-dismiss.js';
-import { applyWholesale, salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
+import { salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 import { catalogCategories, renderCategoryCards } from './category-menu.js';
-import { readShopifyCatalog } from './shopify-data.js';
+import { readCatalogCache, writeCatalogCache, validCatalog } from './catalog-cache.js';
 
 const get = (id) => document.getElementById(id);
 const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -82,7 +82,9 @@ try {
 }
 
 let catalog;
-let storefrontData;
+let catalogRefreshTimer;
+let catalogEtag;
+let firstCatalogLoad = true;
 let loadRevision = 0;
 let refreshOpenProductStock;
 let familiesByHandle = new Map();
@@ -918,98 +920,58 @@ function setStatus(source) {
   }
 }
 
-async function getData(url, timeout) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error('Katalog yanıtı alınamadı');
-    return await response.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 async function load() {
+  clearTimeout(catalogRefreshTimer);
   const revision = ++loadRevision;
-  setStatus('loading');
+  let nextCheck = 60000;
+  if (firstCatalogLoad) {
+    firstCatalogLoad = false;
+    const saved = await Promise.race([readCatalogCache(), new Promise(resolve => setTimeout(() => resolve(null), 1500))]);
+    if (saved && revision === loadRevision) { catalogEtag = saved.etag; displayCatalog(saved.data, 'saved'); }
+  }
+  if (revision !== loadRevision) return;
+  if (document.hidden && catalog) {
+    catalogRefreshTimer = setTimeout(load, nextCheck);
+    return;
+  }
+  if (!catalog) setStatus('loading');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const source = await getData('/api/shopify-catalog?part=info', 25000);
+    const response = await fetch('/api/catalog', { cache: 'no-store', signal: controller.signal,
+      headers: catalogEtag ? { 'If-None-Match': catalogEtag } : {} });
     if (revision !== loadRevision) return;
-    const upload = get('wholesale-admin-open');
-    if (upload) upload.hidden = source.enabled !== false;
-    if (source.enabled === true) {
-      if (catalog?.source !== 'shopify') catalog = null;
-      const read = async (url) => {
-        for (let attempt = 0; attempt < 6; attempt++) {
-          if (revision !== loadRevision) throw new Error('Eski katalog yükleme isteği');
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 65000);
-          try {
-            const response = await fetch(url, { signal: controller.signal });
-            if (response.status === 429 && attempt < 5) {
-              await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
-              continue;
-            }
-            if (!response.ok) throw new Error('Toptan katalog okunamadı.');
-            return await response.json();
-          } finally { clearTimeout(timer); }
-        }
-        throw new Error('Shopify istek sınırı');
-      };
-      const data = await readShopifyCatalog(source.catalog, read, (count, phase) => {
-        if (revision !== loadRevision) return;
-        get('sync').hidden = false;
-        get('sync').textContent = phase === 'prices'
-          ? `${source.catalog.title} fiyatları eşleştiriliyor… ${number.format(count)} varyant`
-          : `${source.catalog.title} yükleniyor… ${number.format(count)} ürün`;
-      });
-      if (revision !== loadRevision) return;
-      displayCatalog(data, 'live');
+    if (response.status === 202) {
+      nextCheck = 3000;
+      get('sync').hidden = false;
+      get('sync').textContent = catalog ? 'Toptan Katalog güncelleniyor.' : 'Toptan Katalog hazırlanıyor…';
       return;
     }
-    if (source.enabled !== false) throw new Error('Katalog kaynağı doğrulanamadı.');
+    if (response.status !== 304) {
+      if (!response.ok) throw new Error('Toptan katalog okunamadı.');
+      const data = await response.json();
+      if (!validCatalog(data)) throw new Error('Toptan katalog kaynağı doğrulanamadı.');
+      if (revision !== loadRevision) return;
+      catalogEtag = response.headers.get('ETag');
+      displayCatalog(data, 'live');
+      void writeCatalogCache(data, catalogEtag);
+    }
+    if (response.headers.get('X-Catalog-Refreshing') === '1') nextCheck = 5000;
+    if (catalog) setStatus('live');
   } catch {
     if (revision !== loadRevision) return;
-    // Never substitute a retail snapshot when the selected wholesale source fails.
-    setStatus(catalog?.source === 'shopify' ? 'saved' : 'error');
+    setStatus(catalog ? 'saved' : 'error');
     get('sync').hidden = false;
-    get('sync').textContent = catalog?.source === 'shopify'
-      ? 'Shopify güncellenemedi · Son alınan toptan katalog gösteriliyor.'
-      : 'Shopify Toptan Katalog okunamadı. Tekrar deneyin.';
+    get('sync').textContent = catalog
+      ? `Toptan Katalog · Son kayıt ${syncTime.format(new Date(catalog.syncedAt))} · Güncellenemedi`
+      : 'Toptan Katalog şu anda alınamıyor. Tekrar deneyin.';
     render();
-    return;
-  }
-  const storefront = async (url, timeout) => {
-    const data = await getData(url, timeout).catch(() => null);
-    return data && Array.isArray(data.rows) && data.rows.length ? data : null;
-  };
-  const live = storefront('/api/catalog', 29000);
-  const snapshot = storefrontData ?? storefront('/catalog-data.json', 10000);
-  const overlay = await getData('/api/wholesale', 10000).catch(() => null);
-  if (revision !== loadRevision) return;
-  if (!(overlay?.active === false || (overlay?.active === true && overlay.products))) {
-    setStatus(catalog ? 'saved' : 'error');
-    render();
-    return;
-  }
-  const saved = await snapshot;
-  if (revision !== loadRevision) return;
-  if (saved) {
-    storefrontData = saved;
-    displayCatalog(applyWholesale(saved, overlay), 'snapshot');
-  }
-  const data = await live;
-  if (revision !== loadRevision) return;
-  if (data) {
-    storefrontData = data;
-    displayCatalog(applyWholesale(data, overlay), 'live');
-  } else {
-    setStatus(catalog ? 'saved' : 'error');
-    render();
+    nextCheck = 15000;
+  } finally {
+    clearTimeout(timeout);
+    if (revision === loadRevision) catalogRefreshTimer = setTimeout(load, nextCheck);
   }
 }
-
 initBackdropDismiss(get('product-dialog'));
 initBackdropDismiss(cardOptionsDialog);
 
@@ -2108,5 +2070,5 @@ get('share').addEventListener('click', async () => {
 
 initRequest();
 get('request-open').addEventListener('request:changed', () => refreshOpenProductStock?.());
-window.addEventListener('wholesale:published', load);
+
 load();

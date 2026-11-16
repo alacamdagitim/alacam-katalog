@@ -5,11 +5,9 @@
   "buildCommand": "",
   "outputDirectory": "public",
   "functions": {
-    "api/catalog.js": { "maxDuration": 30 },
+    "api/catalog.js": { "maxDuration": 300 },
     "api/installments.js": { "maxDuration": 20 },
-    "api/wholesale.js": { "maxDuration": 30 },
-    "api/shopify-status.js": { "maxDuration": 30 },
-    "api/shopify-catalog.js": { "maxDuration": 60 }
+    "api/shopify-status.js": { "maxDuration": 30 }
   },
   "headers": [
     { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }

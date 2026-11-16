@@ -6,13 +6,11 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#f5f6fa">
   <meta name="description" content="Alaçam Dağıtım ürünlerini, paket ve koli seçeneklerini tek katalogda inceleyin.">
-  <title>Ürün Kataloğu | Alaçam Dağıtım</title>
+  <title>Toptan Katalog | Alaçam Dağıtım</title>
   <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/wholesale-admin.css">
   <link rel="stylesheet" href="/category-menu.css">
-  <script type="module" src="/catalog.js"></script>
-  <script type="module" src="/wholesale-admin.js"></script>
+  <script type="module" src="/catalog.js?v=shopify-snapshot-v3"></script>
 </head>
 <body class="is-category-menu">
   <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -48,7 +46,7 @@
           <a class="brand" href="/" aria-label="Alaçam Dağıtım katalog ana sayfası">
             <img src="/assets/alacam-logo.png" alt="Alaçam Dağıtım" width="174" height="39">
           </a>
-          <h1 id="catalog-title">Ürün kataloğu</h1>
+          <h1 id="catalog-title">Toptan Katalog</h1>
         </div>
         <ul class="catalog-totals" aria-label="Katalog özeti">
           <li><strong id="product-total">—</strong><span>ürün</span></li>
@@ -71,10 +69,6 @@
           <svg class="icon view-grid-icon" aria-hidden="true"><use href="#i-view-grid"/></svg>
           <svg class="icon view-caret" aria-hidden="true"><use href="#i-down"/></svg>
         </label>
-        <button class="button glass-surface wholesale-admin-open" id="wholesale-admin-open" type="button"
-          aria-label="Katalog yükle" aria-haspopup="dialog" aria-controls="wholesale-admin-dialog">
-          <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span>Katalog yükle</span>
-        </button>
         <button class="button request-open glass-surface" id="request-open" type="button" aria-controls="request-dialog" aria-haspopup="dialog">
           <svg class="icon" aria-hidden="true"><use href="#i-basket"/></svg><span class="request-label">Sepet</span><span id="request-count" hidden></span>
         </button>
@@ -323,74 +317,6 @@
       </div>
       <p id="request-status" class="request-status" role="status"></p>
     </footer>
-  </dialog>
-  <dialog class="wholesale-admin-dialog" id="wholesale-admin-dialog" aria-labelledby="wholesale-admin-title">
-    <header class="wholesale-admin-heading">
-      <h2 id="wholesale-admin-title">Toptan kataloğu yükle</h2>
-      <form method="dialog"><button class="button icon-button" id="wholesale-admin-close" type="submit" aria-label="Kapat">
-        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-      </button></form>
-    </header>
-    <form class="wholesale-admin-form" id="wholesale-admin-form" method="dialog">
-      <label class="wholesale-admin-field">Shopify katalog CSV dosyası
-        <input id="wholesale-admin-file" type="file" accept=".csv,text/csv" required>
-      </label>
-      <fieldset class="wholesale-admin-mode" id="wholesale-admin-mode">
-        <legend>Yükleme biçimi</legend>
-        <label>
-          <input type="radio" name="wholesale-mode" value="merge" aria-labelledby="wholesale-admin-merge-label" aria-describedby="wholesale-admin-merge-help" required>
-          <span><strong id="wholesale-admin-merge-label">Mevcut kataloğu güncelle</strong>
-            <small id="wholesale-admin-merge-help">CSV’de bulunmayan varyantlar katalogda kalır.</small></span>
-        </label>
-        <label>
-          <input type="radio" name="wholesale-mode" value="replace" aria-labelledby="wholesale-admin-replace-label" aria-describedby="wholesale-admin-replace-help" required>
-          <span><strong id="wholesale-admin-replace-label">Sıfırdan oluştur</strong>
-            <small id="wholesale-admin-replace-help">Katalogda yalnızca CSV’deki görünür varyantlar yer alır.</small></span>
-        </label>
-      </fieldset>
-      <label class="wholesale-admin-field" id="wholesale-admin-catalog-field" hidden>Katalog
-        <select id="wholesale-admin-catalog"></select>
-      </label>
-      <section class="wholesale-admin-summary" id="wholesale-admin-summary" aria-labelledby="wholesale-admin-summary-title" hidden>
-        <h3 id="wholesale-admin-summary-title"></h3>
-        <p id="wholesale-admin-summary-date"></p>
-        <p id="wholesale-admin-summary-mode"></p>
-        <h4>Son katalog</h4>
-        <dl>
-          <div><dt>Görünür</dt><dd id="wholesale-admin-visible"></dd></div>
-          <div><dt>Gizli</dt><dd id="wholesale-admin-hidden"></dd></div>
-          <div><dt>Dosyada eşleşmeyen</dt><dd id="wholesale-admin-unmatched"></dd></div>
-        </dl>
-        <h4>Varyant değişiklikleri</h4>
-        <dl class="wholesale-admin-impact">
-          <div><dt>Eklenen</dt><dd id="wholesale-admin-added"></dd></div>
-          <div><dt>Güncellenen</dt><dd id="wholesale-admin-updated"></dd></div>
-          <div><dt>Korunan</dt><dd id="wholesale-admin-preserved"></dd></div>
-          <div><dt>Kaldırılan</dt><dd id="wholesale-admin-removed"></dd></div>
-        </dl>
-      </section>
-      <p class="wholesale-admin-status" id="wholesale-admin-status" role="status"></p>
-      <div class="wholesale-admin-actions">
-        <button class="button" id="wholesale-admin-preview" type="submit">Önizle</button>
-        <button class="button button-accent" id="wholesale-admin-publish" type="button" hidden>Yayımla</button>
-        <button class="button button-accent" id="wholesale-admin-done" type="button" hidden>Tamam</button>
-      </div>
-    </form>
-    <section class="wholesale-admin-reset">
-      <button class="text-button wholesale-reset-toggle" id="wholesale-admin-reset-toggle" type="button"
-        aria-expanded="false" aria-controls="wholesale-admin-reset-panel">
-        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Yüklenen kataloğu sıfırla
-      </button>
-      <div id="wholesale-admin-reset-panel" hidden>
-        <p>Yüklenen toptan fiyatlar ve kurallar kaldırılır. Katalog mağaza ürünlerine ve fiyatlarına döner.</p>
-        <label class="wholesale-admin-field" for="wholesale-admin-reset-word">Onay kelimesi
-          <input id="wholesale-admin-reset-word" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
-            enterkeyhint="go" aria-describedby="wholesale-admin-reset-help" placeholder="sapanca">
-        </label>
-        <p id="wholesale-admin-reset-help"><strong>sapanca</strong> yazıp Enter’a basın.</p>
-      </div>
-      <p class="wholesale-admin-status" id="wholesale-admin-reset-status" role="status"></p>
-    </section>
   </dialog>
   <div class="toast" id="toast" aria-hidden="true" hidden><span class="toast-icon" id="toast-icon"></span><span id="toast-message"></span></div>
   <div class="sr-only" id="toast-announcement" role="status"></div>

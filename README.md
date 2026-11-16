@@ -1,50 +1,35 @@
-# Alaçam Dağıtım Dijital Katalog
+# Alaçam Dağıtım Toptan Katalog
 
-## Katalog ve sepet
+Sitenin tek veri kaynağı Shopify Admin API’deki **Toptan Katalog** (`160658587954`). Normal mağazanın herkese açık ürün uç noktaları, perakende JSON yedeği, CSV fiyat yükleme, yayımlama ve sıfırlama akışları kaldırılmıştır. Katalog bağlantısına sahip herkes fiyatları görebilir.
 
-Her ürün **Liste** görünümünde bir satır, **Kartlar** görünümünde bir kart olarak gösterilir. Varyasyon ve satış seçenekleri satırdan veya karttan seçilebilir. Dikey mobil görünümde kartlar üç sütuna yerleşir. Birden fazla seçim alanı bulunan kartlarda seçenekler ayrı bir panelde açılır.
+## Veri ve açılış
 
-Sepet müşterinin tarayıcısında saklanır. **WhatsApp’ta aç** düğmesi ürünleri, miktarları ve varsa notu içeren bir teklif talebi taslağını mağazanın WhatsApp sohbetinde açar. Mesajı müşteri gönderir.
+Sunucu seçilen etkin kataloğun yayınındaki aktif ürünleri, yayımlanmış varyantları, fiyat listesini, miktar kurallarını ve fiyat kademelerini okur. Görünen her varyantın fiyatı ve sipariş kuralı bu fiyat listesinden gelmelidir; eksik fiyat için standart ürün fiyatına dönülmez. Varyantların barkod, stok, görsel, seçenek ve açıklama bilgileri de kataloğun ürün yayını üzerinden alınır. Karşılaştırma fiyatı varsa aynı katalog fiyat kaydından gelir. Shopify’a yazma yapılmaz.
 
-## Yerel önizleme
+Tamamlanmış ve doğrulanmış katalog, mevcut Private Blob deposunda `catalog/shopify-v3/<catalog-id>/snapshot.json` olarak tek kayıtta saklanır. `/api/catalog` ziyaretçiye bu kaydı verir. Ziyaretçinin tarayıcısı Shopify sayfalarını tek tek indirmez. Kayıt bir dakikadan eskiyse `waitUntil` ile sunucuda arka plan yenilemesi başlatılır; mevcut kayıt bekletilmeden döner. Depodaki koşullu güncelleme kilidi eşzamanlı ziyaretçilerin ayrı taramalar başlatmasını engeller. Yenileme tamamlanmadan yeni kayıt yayımlanmaz; başarısız işlem son doğrulanmış kaydı bozmaz.
 
-Node.js 22 ile proje klasöründe `npm ci` ve `npm run dev` çalıştırın. [127.0.0.1:4173](http://127.0.0.1:4173/) adresini açın.
+Tarayıcı yalnızca bu kaynaktan gelen kataloğu IndexedDB’de saklar ve tekrar açılışta hemen gösterir. ETag ile değişiklik kontrol edilir; değişmeyen yanıtta ürün gövdesi yeniden indirilmez. Sunucuda güncelleme varsa arayüz arka planda sonucu alır; ekran üzerinde her seferinde ürün sayma/yükleme akışı yoktur. İnternet veya Shopify hatasında son toptan kaydın tarihi ve uyarı gösterilir. İlk kurulumda henüz sunucu kaydı yoksa ilk eşitlemenin tamamlanması gerekir.
 
-## Vercel
+## Vercel ayarları
 
-Git deposunu Vercel’e yeni proje olarak içe aktarın. **Root Directory** olarak deponun kökünü seçin. `vercel.json`, `public` klasöründeki statik arayüzü ve API fonksiyonlarını yapılandırır. Proje Node.js 22 kullanır. Vercel bağımlılıkları kurar ve statik dosyaları doğrudan yayımlar.
+- `SHOPIFY_SHOP=dx0nin-1q.myshopify.com`
+- `SHOPIFY_CATALOG_ID=160658587954`
+- `SHOPIFY_CLIENT_ID`
+- `SHOPIFY_CLIENT_SECRET` — Secret türünde
+- Bağlı Private Blob deposunun `BLOB_READ_WRITE_TOKEN` veya `BLOB_STORE_ID` değeri
 
-Katalog sayfası arama motorları için `noindex` olarak işaretlenir. Yayın bağlantısına sahip kişiler kataloğu açabilir.
+Uygulama aynı Shopify kuruluşunda mağazaya kurulmuş olmalıdır. `read_products` ve `read_publications` gereklidir. `read_companies` şirket bağlantısını kontrol etmek için kullanılabilir. Erişim belirteci sunucuda otomatik yenilenir; istemciye anahtar veya belirteç gönderilmez.
 
-## Ürün verisi
+Vercel dağıtımı Node.js 22 ve Fluid Compute kullanır. `/api/catalog` için 300 saniye süre ayrılmıştır; eşitleme kendi 240 saniyelik sınırını uygular. `/api/shopify-status` uygulama ve katalog erişimini kontrol eder. Sayfa açılışları yenilemeyi tetikler; ayrıca bağımsız bir zamanlanmış iş tanımlanmamıştır.
 
-### Shopify uygulama bağlantısı
+## Yerel çalışma ve doğrulama
 
-Vercel üretim ortamında `SHOPIFY_SHOP` (`dx0nin-1q.myshopify.com`), `SHOPIFY_CATALOG_ID` (`160658587954`), `SHOPIFY_CLIENT_ID` ve Secret türünde `SHOPIFY_CLIENT_SECRET` tanımlanır. Anahtarlar yalnızca sunucuda kullanılır; uygulama mağazayla aynı Shopify kuruluşunda olmalı ve mağazaya yüklenmiş olmalıdır. Sunucu erişim belirtecini gerektiğinde yeniler.
+Node.js 22 ile `npm ci`. Ortam ayarlarını yükledikten sonra `SHOPIFY_CACHE_DIRECTORY` için `public` dışında bir mutlak dizin seçerek `npm run dev` çalıştırın. Yerel adres `http://127.0.0.1:4173/`. Shopify ayarları yoksa perakende örnek veri gösterilmez.
 
-Yeni kod dağıtıldıktan sonra `/api/shopify-status` bağlantıyı, tam katalog kimliğini, etkinlik durumunu ve kurulu uygulamanın izinlerini kontrol eder. Başarılı yanıtta `connected: true` ve `catalog.title` bulunur. `capabilities.createDraftOrder`, taslak oluşturma izninin bulunup bulunmadığını belirtir; taslak siparişin oluşturulduğu anlamına gelmez. Hata yanıtında yalnızca kontrollü hata kodu ve açıklaması döner; gizli anahtar veya erişim belirteci dönmez. Yerel kontrol için aynı ortam değişkenleriyle `npm run dev` çalıştırılır.
+`npm run sync`, aynı Shopify eşitlemesini sunucu kaydına uygular; CSV veya mağaza dosyası kabul etmez. `node --test test/*.test.cjs` ile bağlantı, kaynak doğruluğu, depolama, eşzamanlı yenileme ve ETag testleri çalıştırılır.
 
-Bu dört ayar tanımlandığında site `/api/shopify-catalog` üzerinden yalnızca seçilen etkin kataloğun yayımlanmış ve aktif ürünlerini alır. Ürün, fiyat, miktar kuralı, ek varyant ve fiyat kademesi sayfalarının tamamı okunur. Sabit fiyatlar önceliklidir; sabit fiyatı olmayan varyantlarda yalnızca katalogda açıkça tanımlı yüzde ayarlaması uygulanır. TRY dışında fiyat kaynağı kabul edilmez. Fiyat ve kurallar eksiksiz doğrulanmadan arayüz yayımlanmaz. Bağlantı hatasında normal mağaza fiyatlarına veya paketlenmiş perakende kaydına dönülmez; aynı sayfada daha önce alınmış toptan veri varsa güncellenemedi bilgisiyle korunur.
+## Sepet
 
-Shopify sayfaları en fazla 60 saniye önbelleğe alınır; sayfa açılışında veya yeniden yüklendiğinde otomatik okunur. Açık sayfada arka planda periyodik eşitleme yoktur. Katalog başlığı ve Shopify kaynağı arayüzde görünür. Shopify kaynağı seçiliyken CSV yükleme düğmesi gizlenir ve CSV yayınlama/sıfırlama istekleri reddedilir; Shopify’daki fiyatları değiştirmez. Dört Shopify ayarı da yoksa eski yerel önizleme/CSV akışı kullanılabilir; eksik yapılandırma ise hata verir.
+Sepet ve not tarayıcıda tutulur. Minimum alım, artış adedi ve miktara bağlı fiyatlar Shopify kataloğundan uygulanır. WhatsApp düğmesi müşterinin göndereceği talep taslağını açar. Shopify taslak sipariş oluşturma izni tanımlanmış olsa da otomatik taslak sipariş gönderimi henüz etkin değildir. Giriş doğrulaması olmadan bir Shopify şirket hesabına sipariş atanmaz.
 
-WhatsApp sepet akışı korunur. Taslak sipariş gönderim arayüzü henüz etkin değildir. Kullanıcı, ayrı Dijital Katalog bağlantısına sahip herkesin toptan fiyatları görebilmesini seçmiştir; giriş doğrulanmadan Shopify şirket hesabına sipariş ataması yapılmamalıdır.
-
-Kaynaklar: [Shopify uygulama kimlik doğrulaması](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant), [katalog sorgusu](https://shopify.dev/docs/api/admin-graphql/latest/queries/catalogs).
-
-Arayüz önce kayıtlı kataloğu gösterir, ardından Alaçam Dağıtım mağazasının herkese açık ürün listesini sunucu üzerinden kontrol eder. Vercel güncel yanıtı 15 dakika önbelleğe alır. Kaynağa ulaşılamadığında arayüz son paketlenmiş veriyi ve tarihini gösterir. Kayıtlı veriyi yenilemek için `npm run sync` çalıştırın.
-
-Barkod ve ölçü bilgileri `npm run sync` ile güncellenir. Mağaza istek sınırına ulaşıldığında doğrulanan bilgiler saklanır ve sonraki eşitleme eksik ürünlerden devam eder.
-
-Taksit seçenekleri seçili satış tutarı için PayTR’den alınır. Varsayılan ayarlar mağazanın herkese açık taksit tablosuna aittir. Bu ayarları sunucuda değiştirmek gerekirse `PAYTR_INSTALLMENT_TOKEN` ve `PAYTR_MERCHANT_ID` birlikte tanımlanabilir.
-
-## Toptan katalog yayını
-
-1. Vercel projesinin **Storage** bölümünde bir **Private Blob** deposu oluşturup üretim ortamına bağlayın. Bağlantıdan sonra güncel kodu dağıtın.
-2. Ana katalog sayfasında **Katalog yükle** düğmesinden UTF-8 Shopify katalog CSV dosyasını seçin. Dosya en fazla 3,5 MB olabilir.
-3. Her dosya için **Mevcut kataloğu güncelle** veya **Sıfırdan oluştur** seçeneğini işaretleyin. İlk seçenek, dosyada yer almayan mevcut toptan kayıtları korur. İkinci seçenek kataloğu yüklenen dosyadaki görünür varyantlardan oluşturur. İlk yayında her iki seçenek de dosyadan yeni bir katalog oluşturur.
-4. **Önizle** ile eklenecek, güncellenecek, korunacak ve kaldırılacak varyant sayılarını kontrol edin. **Yayımla** ile işlemi tamamlayın. Önizlemeden sonra katalog değişirse dosyayı yeniden önizleyin. Katalog bağlantısını açan herkes geçerli bir dosyayla yayımlama yapabilir.
-
-Yayın, CSV’deki ürünleri paketlenmiş mağaza kaydıyla Shopify ürün tanıtıcısı ve sıralı seçenek adları/değerleri üzerinden eşleştirir. Güncellenen satırlarda dosyadaki fiyat ve kurallar uygulanır. Boş fiyat alanı mağaza fiyatına döner. Dosyada açıkça yayına kapatılan ürün veya varyant katalogdan kaldırılır. Shopify’a yeni eklenen ürünler eşleşmiyorsa `npm run sync` ile mağaza kaydını güncelleyin, yeni kaydı dağıtın ve CSV’yi tekrar yayımlayın. Özel depoda eşleştirilmiş yayın verisi tutulur.
-
-Yerel testte Blob yerine `WHOLESALE_LOCAL_FILE` ile `public` dışında bir mutlak dosya yolu seçin. Aynı değişkenle yerel sunucuyu başlatıp ana katalog sayfasını açın.
+Kaynaklar: [Shopify fiyat listesi](https://shopify.dev/docs/api/admin-graphql/latest/objects/PriceList), [Vercel arka plan işlemleri](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package), [Private Blob](https://vercel.com/docs/vercel-blob/private-storage).

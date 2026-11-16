@@ -69,6 +69,9 @@ module.exports = async (request, response) => {
       return send(503, { error: storageError });
     }
   }
+  if (process.env.SHOPIFY_CATALOG_ID) {
+    return send(409, { error: 'Bu site Shopify Toptan Katalog verisini kullanıyor. Fiyat ve koli kurallarını Shopify kataloğundan güncelleyin.' });
+  }
   if (request.method !== 'POST' && request.method !== 'DELETE') {
     response.setHeader('Allow', 'GET, HEAD, POST, DELETE');
     return send(405, { error: 'Bu istek yöntemi desteklenmiyor.' });

@@ -4,6 +4,7 @@ import { initColumnWidths } from './column-widths.js';
 import { initBackdropDismiss } from './dialog-dismiss.js';
 import { applyWholesale, salePrice, stepQuantity, validQuantity, wholesaleLimits, wholesaleMoney, wholesaleRule, wholesaleUnitCents } from './wholesale.js';
 import { catalogCategories, renderCategoryCards } from './category-menu.js';
+import { readShopifyCatalog } from './shopify-data.js';
 
 const get = (id) => document.getElementById(id);
 const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -911,6 +912,10 @@ function setStatus(source) {
   const status = get('sync');
   status.hidden = source !== 'saved';
   status.textContent = status.hidden ? '' : `Kayıtlı katalog · ${syncTime.format(new Date(catalog.syncedAt))}`;
+  if (catalog?.source === 'shopify') {
+    status.hidden = false;
+    status.textContent = `${catalog.catalogTitle} · Shopify · ${syncTime.format(new Date(catalog.syncedAt))}`;
+  }
 }
 
 async function getData(url, timeout) {
@@ -928,6 +933,51 @@ async function getData(url, timeout) {
 async function load() {
   const revision = ++loadRevision;
   setStatus('loading');
+  try {
+    const source = await getData('/api/shopify-catalog?part=info', 25000);
+    if (revision !== loadRevision) return;
+    const upload = get('wholesale-admin-open');
+    if (upload) upload.hidden = source.enabled !== false;
+    if (source.enabled === true) {
+      if (catalog?.source !== 'shopify') catalog = null;
+      const read = async (url) => {
+        for (let attempt = 0; attempt < 6; attempt++) {
+          if (revision !== loadRevision) throw new Error('Eski katalog yükleme isteği');
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 65000);
+          try {
+            const response = await fetch(url, { signal: controller.signal });
+            if (response.status === 429 && attempt < 5) {
+              await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+              continue;
+            }
+            if (!response.ok) throw new Error('Toptan katalog okunamadı.');
+            return await response.json();
+          } finally { clearTimeout(timer); }
+        }
+        throw new Error('Shopify istek sınırı');
+      };
+      const data = await readShopifyCatalog(source.catalog, read, (count) => {
+        if (revision !== loadRevision) return;
+        get('sync').hidden = false;
+        get('sync').textContent = `${source.catalog.title} yükleniyor… ${number.format(count)} ürün`;
+      });
+      if (revision !== loadRevision) return;
+      displayCatalog(data, 'live');
+      return;
+    }
+    if (source.enabled !== false) throw new Error('Katalog kaynağı doğrulanamadı.');
+  } catch {
+    if (revision !== loadRevision) return;
+    // Never substitute a retail snapshot when the selected wholesale source fails.
+    setStatus(catalog?.source === 'shopify' ? 'saved' : 'error');
+    get('sync').hidden = false;
+    get('sync').textContent = catalog?.source === 'shopify'
+      ? 'Shopify güncellenemedi · Son alınan toptan katalog gösteriliyor.'
+      : 'Shopify Toptan Katalog okunamadı. Tekrar deneyin.';
+    render();
+    return;
+  }
   const storefront = async (url, timeout) => {
     const data = await getData(url, timeout).catch(() => null);
     return data && Array.isArray(data.rows) && data.rows.length ? data : null;

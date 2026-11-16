@@ -25,13 +25,16 @@ module.exports = async (request, response) => {
   const params = new URL(request.url, 'https://localhost').searchParams;
   const part = params.get('part') ?? 'info';
   const after = params.get('after');
-  if (!['info', 'products', 'prices', 'rules'].includes(part) || [...params.keys()].some((key) => !['part', 'after'].includes(key))
-      || params.getAll('part').length > 1 || params.getAll('after').length > 1 || (after && after.length > 2048)) {
+  const productIds = params.has('products') ? params.get('products').split(',') : [];
+  if (!['info', 'products', 'prices', 'rules'].includes(part) || [...params.keys()].some((key) => !['part', 'after', 'products'].includes(key))
+      || params.getAll('part').length > 1 || params.getAll('after').length > 1 || params.getAll('products').length > 1 || (after && after.length > 2048)
+      || (params.has('products') && (part !== 'prices' || productIds.length > 60 || productIds.some((id) => !/^[1-9]\d{0,19}$/.test(id))))) {
     return send(400, { error: 'Katalog sayfası isteği geçersiz.' });
   }
   try {
     // No settings means legacy local preview; partially configured production fails closed.
     if (!['SHOPIFY_SHOP', 'SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET', 'SHOPIFY_CATALOG_ID'].some((key) => process.env[key])) {
+      if (process.env.VERCEL) throw new ShopifyError('configuration_missing', 'Shopify bağlantı ayarları eksik.');
       return send(200, { enabled: false });
     }
     const { client, catalogId } = shopifyClient();
@@ -39,7 +42,7 @@ module.exports = async (request, response) => {
     const info = await memo(`info:${catalogId}`, () => catalogInfo(client, catalogId));
     if (part === 'info') return send(200, { enabled: true, catalog: { id: info.id, title: info.title, currency: info.currency, adjustment: info.adjustment } });
     const fetcher = { products: productPage, prices: pricePage, rules: rulePage }[part];
-    const body = await memo(JSON.stringify([catalogId, info.publication, info.priceList, part, after]), () => fetcher(client, info, after));
+    const body = await memo(JSON.stringify([catalogId, info.publication, info.priceList, part, after, productIds]), () => fetcher(client, info, after, productIds));
     response.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60');
     return send(200, { enabled: true, catalogId, ...body });
   } catch (error) {

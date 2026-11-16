@@ -39,10 +39,14 @@ export function wholesaleUnitCents(rule, price, quantity) {
 }
 
 function applyPrices(item, rule) {
+  const nextPrice = rule.price ?? item.price;
+  const nextUnitPrice = Number.isFinite(item.unitPrice) && item.price > 0 && Number.isFinite(nextPrice)
+    ? item.unitPrice * nextPrice / item.price : item.unitPrice;
   return {
     ...item,
     sku: rule.sku || item.sku,
-    price: rule.price ?? item.price,
+    price: nextPrice,
+    unitPrice: nextUnitPrice,
     compareAtPrice: rule.compareAt ?? null,
     wholesale: rule,
   };
@@ -74,11 +78,16 @@ function applyRow(row, rules) {
     id: primary.id,
     price: primary.price ?? (keepPrimary ? row.price : null),
     compareAtPrice: primary.compareAtPrice,
+    wholesale: primary.wholesale,
+    unitPrice: primary.unitPrice ?? null,
+    unitPriceUnit: primary.unitPriceUnit ?? null,
     barcode: primary.barcode ?? (keepPrimary ? row.barcode : null),
     sku: primary.sku,
     saleOptionValue: primary.optionValue,
     quantity: amount ? Number(amount) : keepPrimary ? row.quantity : null,
     stock,
+    casePrice: box?.price ?? null,
+    caseCompareAtPrice: box?.compareAtPrice ?? null,
     variants,
     caseBarcode: box?.barcode ?? null,
     hadCaseOption: row.variants.some(({ label }) => label?.startsWith('1 koli')),
